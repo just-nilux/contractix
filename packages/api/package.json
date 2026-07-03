@@ -7,19 +7,26 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsup",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@contractix/shared": "workspace:*",
     "@hono/node-server": "^2.0.8",
     "@hono/zod-openapi": "^1.4.0",
     "dotenv": "^17.2.0",
+    "drizzle-orm": "catalog:",
     "hono": "^4.12.27",
+    "pg": "^8.22.0",
     "pino": "^10.3.1",
+    "uuid": "^14.0.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
     "pino-pretty": "^13.1.0",
     "tsup": "^8.5.1",
     "tsx": "catalog:",

@@ -18,7 +18,9 @@
     "test:int": "vitest run --project integration --passWithNoTests",
     "test:all": "vitest run --passWithNoTests",
     "compose:up": "docker compose up -d --wait",
-    "compose:down": "docker compose down"
+    "compose:down": "docker compose down",
+    "db:generate": "pnpm --filter @contractix/api db:generate",
+    "db:migrate": "pnpm --filter @contractix/api db:migrate"
   },
   "devDependencies": {
     "@types/node": "catalog:",

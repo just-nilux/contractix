@@ -16,8 +16,8 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .min(1)
-    .default("postgres://contractix:contractix@localhost:5432/contractix"),
-  REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
+    .default("postgres://contractix:contractix@localhost:5433/contractix"),
+  REDIS_URL: z.string().min(1).default("redis://localhost:6380"),
   STORAGE_DIR: z.string().min(1).default("./data/files"),
   JINA_API_KEY: z.string().optional(),
   EVAL_ALLOW_LIVE_PROVIDERS: z
