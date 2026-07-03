@@ -54,7 +54,8 @@ jobs:
     env:
       DATABASE_URL: postgres://contractix:contractix@localhost:5433/contractix
       REDIS_URL: redis://localhost:6380
-      STORAGE_DIR: ${{ runner.temp }}/files
+      # runner context is unavailable in job-level env; literal path on the Linux runner
+      STORAGE_DIR: /tmp/contractix-files
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
