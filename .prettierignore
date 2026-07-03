@@ -1,0 +1,9 @@
+# marked DO-NOT-EDIT in the document itself
+PRD.md
+
+pnpm-lock.yaml
+corpus/dist/
+packages/api/drizzle/
+data/
+dist/
+coverage/
