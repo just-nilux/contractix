@@ -8,12 +8,15 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "dev": "pnpm --parallel --filter @contractix/api --filter @contractix/web dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "vitest run --project unit --passWithNoTests",
+    "test:int": "vitest run --project integration --passWithNoTests",
+    "test:all": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -21,6 +24,7 @@
     "prettier": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
+    "typescript-eslint": "catalog:",
+    "vitest": "catalog:"
   }
 }
