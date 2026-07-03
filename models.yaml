@@ -1,0 +1,30 @@
+# Single source of truth for model/provider pinning (ADR-0004).
+# Nothing else in the codebase names a model or a dimension.
+# Landscape re-checked and pinned: 2026-07-03.
+
+version: 1
+
+embeddings:
+  provider: jina # jina | fake (keyless dev/CI)
+  model: jina-embeddings-v4 # upgrade candidate: jina-embeddings-v5-text (re-eval before swap)
+  dimensions: 1024 # matryoshka truncation; must equal chunks.embedding vector dims (boot-asserted)
+  api_key_env: JINA_API_KEY
+  base_url: https://api.jina.ai/v1
+
+reranker:
+  provider: jina # jina | passthrough (keyless dev/CI)
+  model: jina-reranker-v3
+  api_key_env: JINA_API_KEY
+  base_url: https://api.jina.ai/v1
+
+llm:
+  # Used from Phase 2 (classification/extraction) and Phase 3 (agent loop).
+  primary:
+    provider: anthropic
+    model: claude-sonnet-5 # agent loop, report generation
+    small_model: claude-haiku-4-5-20251001 # classification, extraction repair
+    api_key_env: ANTHROPIC_API_KEY
+  fallback:
+    provider: openai
+    model: null # pinned in Phase 3 with the dual-provider router
+    api_key_env: OPENAI_API_KEY
