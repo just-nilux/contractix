@@ -22,8 +22,7 @@ services:
     image: redis:7.4-alpine
     # noeviction is a BullMQ hard requirement: an evicting Redis silently
     # corrupts queue state. The worker asserts this policy at boot.
-    command:
-      ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
     ports:
       - "6380:6379"
     volumes:
