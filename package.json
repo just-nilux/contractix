@@ -20,11 +20,14 @@
     "compose:up": "docker compose up -d --wait",
     "compose:down": "docker compose down",
     "db:generate": "pnpm --filter @contractix/api db:generate",
-    "db:migrate": "pnpm --filter @contractix/api db:migrate"
+    "db:migrate": "pnpm --filter @contractix/api db:migrate",
+    "corpus:generate": "tsx scripts/generate-corpus.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "docx": "^9.7.1",
     "eslint": "catalog:",
+    "playwright": "^1.61.1",
     "prettier": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

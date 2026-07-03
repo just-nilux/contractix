@@ -1,0 +1,70 @@
+/*
+ * Shared print styles for corpus generation.
+ * font-variant-ligatures: none is load-bearing - Chromium otherwise emits
+ * ligature codepoints (ﬁ) into the PDF text layer, silently breaking
+ * trigram/FTS matches on German legal terms (normalize.ts NFKC is the second
+ * line of defense; the corpus should not depend on it).
+ */
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  font-variant-ligatures: none;
+  hyphens: none;
+}
+
+body {
+  font-size: 11px;
+  line-height: 1.55;
+  color: #111;
+  margin: 0;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0 0 6px 0;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: #333;
+  margin-bottom: 28px;
+}
+
+h2 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 26px 0 8px 0;
+  page-break-after: avoid;
+}
+
+p {
+  margin: 0 0 9px 0;
+  text-align: justify;
+}
+
+table {
+  border-collapse: collapse;
+  margin: 10px 0 14px 0;
+  width: 100%;
+  font-size: 10.5px;
+}
+
+th,
+td {
+  border: 1px solid #666;
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.signatures {
+  margin-top: 44px;
+  display: flex;
+  gap: 60px;
+}
+
+.signatures div {
+  border-top: 1px solid #333;
+  padding-top: 4px;
+  width: 220px;
+  font-size: 10px;
+}

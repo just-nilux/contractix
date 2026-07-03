@@ -1,0 +1,35 @@
+{
+  "note": "All documents are synthetic, authored for this repository. No real person, company, or agreement is represented.",
+  "documents": [
+    {
+      "file": "offer_de_senior_eng.pdf",
+      "language": "de",
+      "type": "employment_offer",
+      "sha256": "fc8cf028b6a9bc72bd530447055eb2f82780d2c73463241a0cccafd08f83414b"
+    },
+    {
+      "file": "offer_en_startup.pdf",
+      "language": "en",
+      "type": "employment_offer",
+      "sha256": "05b06a7eb7e13c7f380ded307272b9555e5685ac81a120ec5664f0796a0702bf"
+    },
+    {
+      "file": "vsop_de.pdf",
+      "language": "de",
+      "type": "vsop_esop_agreement",
+      "sha256": "1fdc6b2f619908a009ee16b1196465de429cf8805a26947a1b35229011681d38"
+    },
+    {
+      "file": "term_sheet_en.pdf",
+      "language": "en",
+      "type": "term_sheet",
+      "sha256": "ce84332d54b80190e867a797235324b9e3ace4f30614290fe90bb60d6d653910"
+    },
+    {
+      "file": "arbeitsvertrag_de.docx",
+      "language": "de",
+      "type": "employment_contract",
+      "sha256": "62f7df8bb43f4e7c0cde6845bac5f1e36a4d21a2ec45c69824fca0a17958ec7d"
+    }
+  ]
+}
