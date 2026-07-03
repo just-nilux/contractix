@@ -1,0 +1,76 @@
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { and, eq } from "drizzle-orm";
+
+import { cases } from "../db/schema/index.js";
+import { ensureDevTenant } from "../db/tenancy.js";
+import { type AppDeps } from "../deps.js";
+import { searchClauses } from "../retrieval/search-service.js";
+
+const searchResultSchema = z.object({
+  clauseId: z.uuid(),
+  chunkId: z.uuid(),
+  documentId: z.uuid(),
+  clauseRef: z.string(),
+  serializedClauseId: z.string(),
+  clausePath: z.string(),
+  heading: z.string().nullable(),
+  headingPath: z.array(z.string()),
+  page: z.number().int(),
+  charStart: z.number().int(),
+  charEnd: z.number().int(),
+  snippet: z.string(),
+  scores: z.object({ fused: z.number(), rerank: z.number().nullable() }),
+});
+
+const searchRoute = createRoute({
+  method: "get",
+  path: "/cases/{caseId}/search",
+  summary: "Hybrid clause search with structural citations",
+  description:
+    "pgvector HNSW + language-aware full-text + trigram, fused with RRF (k=60), " +
+    "reranked to top-k clauses. Every hit carries clause_ref + char offsets (FR-1.4).",
+  request: {
+    params: z.object({ caseId: z.uuid() }),
+    query: z.object({
+      q: z.string().min(1).max(500),
+      doc_id: z.uuid().optional(),
+      top_k: z.coerce.number().int().min(1).max(20).default(8),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Ranked clause citations",
+      content: {
+        "application/json": {
+          schema: z.object({ query: z.string(), results: z.array(searchResultSchema) }),
+        },
+      },
+    },
+    404: { description: "Case not found" },
+  },
+});
+
+export function searchRoutes(deps: AppDeps) {
+  const app = new OpenAPIHono();
+
+  app.openapi(searchRoute, async (c) => {
+    const { caseId } = c.req.valid("param");
+    const { q, doc_id, top_k } = c.req.valid("query");
+    const tenantId = await ensureDevTenant(deps.db);
+
+    const owningCase = await deps.db
+      .select({ id: cases.id })
+      .from(cases)
+      .where(and(eq(cases.id, caseId), eq(cases.tenantId, tenantId)))
+      .limit(1);
+    if (!owningCase[0]) return c.body(null, 404);
+
+    const results = await searchClauses(
+      { db: deps.db, embeddings: deps.providers.embeddings, reranker: deps.providers.reranker },
+      { tenantId, caseId, documentId: doc_id, query: q, topK: top_k },
+    );
+    return c.json({ query: q, results }, 200);
+  });
+
+  return app;
+}

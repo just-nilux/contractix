@@ -1,7 +1,11 @@
 import { type Redis } from "ioredis";
 
+import { loadModelsConfig } from "@contractix/shared";
+
 import { env } from "./config/env.js";
 import { db, type Db } from "./db/client.js";
+import { logger } from "./logger.js";
+import { createProviders, type ProviderBundle } from "./providers/index.js";
 import { assertNoEviction, createRedis } from "./queue/connection.js";
 import { createIngestQueue, type IngestQueue } from "./queue/ingest.js";
 import { LocalBlobStore } from "./storage/local.js";
@@ -13,6 +17,7 @@ export interface AppDeps {
   db: Db;
   blobStore: LocalBlobStore;
   ingestQueue: IngestQueue;
+  providers: ProviderBundle;
   maxUploadBytes: number;
 }
 
@@ -27,11 +32,19 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
   const blobStore = new LocalBlobStore(env.STORAGE_DIR);
   await blobStore.init();
 
+  const providers = createProviders(loadModelsConfig(), {
+    envVars: process.env,
+    production: env.NODE_ENV === "production",
+    onFallback: (role, reason) =>
+      logger.warn({ role, reason }, "provider degraded to keyless fake"),
+  });
+
   return {
     db,
     redis,
     blobStore,
     ingestQueue: createIngestQueue(redis),
+    providers,
     maxUploadBytes: MAX_UPLOAD_BYTES,
   };
 }
