@@ -16,7 +16,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run --project unit --passWithNoTests",
     "test:int": "vitest run --project integration --passWithNoTests",
-    "test:all": "vitest run --passWithNoTests"
+    "test:all": "vitest run --passWithNoTests",
+    "compose:up": "docker compose up -d --wait",
+    "compose:down": "docker compose down"
   },
   "devDependencies": {
     "@types/node": "catalog:",
