@@ -146,10 +146,26 @@ importers:
         version: 6.0.3
 
   packages/eval:
+    dependencies:
+      '@contractix/api':
+        specifier: workspace:*
+        version: link:../api
+      '@contractix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.0
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

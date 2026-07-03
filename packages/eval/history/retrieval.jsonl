@@ -1,0 +1,1 @@
+{"date":"2026-07-03T20:42:20.762Z","git_sha":"09192cd","embeddings":"fake:char-trigram@1024","reranker":"passthrough","live":false,"n":30,"recallAtK":0.9666666666666667,"mrrAtK":0.8638888888888889,"allGoldCoverageAtK":0.9666666666666667,"p95LatencyMs":20.377791000000002}

@@ -21,7 +21,9 @@
     "compose:down": "docker compose down",
     "db:generate": "pnpm --filter @contractix/api db:generate",
     "db:migrate": "pnpm --filter @contractix/api db:migrate",
-    "corpus:generate": "tsx scripts/generate-corpus.ts"
+    "corpus:generate": "tsx scripts/generate-corpus.ts",
+    "seed:demo": "pnpm --filter @contractix/api seed:demo",
+    "eval:retrieval": "pnpm --filter @contractix/eval retrieval"
   },
   "devDependencies": {
     "@types/node": "catalog:",
