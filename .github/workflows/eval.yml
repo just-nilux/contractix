@@ -1,0 +1,76 @@
+name: eval
+
+# Quality gate (PRD §7): runs on every PR touching retrieval-relevant code,
+# with live providers + the committed embedding cache. ci.yml stays keyless
+# and gates correctness only.
+on:
+  pull_request:
+    paths:
+      - "packages/api/src/ingestion/**"
+      - "packages/api/src/retrieval/**"
+      - "packages/api/src/providers/**"
+      - "packages/api/drizzle/**"
+      - "packages/eval/**"
+      - "corpus/**"
+      - "models.yaml"
+      - ".github/workflows/eval.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retrieval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: contractix
+          POSTGRES_PASSWORD: contractix
+          POSTGRES_DB: contractix
+        ports:
+          - "5433:5432"
+        options: >-
+          --health-cmd "pg_isready -U contractix -d contractix"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://contractix:contractix@localhost:5433/contractix
+      STORAGE_DIR: /tmp/contractix-eval-files
+      JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+      EVAL_ALLOW_LIVE_PROVIDERS: "true"
+    steps:
+      - name: Detect provider secret
+        id: key
+        run: echo "present=${{ secrets.JINA_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Fail-soft without secret (forks)
+        if: steps.key.outputs.present != 'true'
+        run: |
+          echo "::notice::JINA_API_KEY secret unavailable - retrieval eval skipped. A maintainer must run this workflow via workflow_dispatch."
+
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.present == 'true'
+      - uses: pnpm/action-setup@v6
+        if: steps.key.outputs.present == 'true'
+      - uses: actions/setup-node@v6
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.key.outputs.present == 'true'
+      - run: pnpm db:migrate
+        if: steps.key.outputs.present == 'true'
+      - name: Retrieval eval with baseline gate
+        if: steps.key.outputs.present == 'true'
+        run: pnpm --filter @contractix/eval retrieval -- --gate
+      - name: Upload results
+        if: steps.key.outputs.present == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: retrieval-eval-results
+          path: packages/eval/results/latest.json
