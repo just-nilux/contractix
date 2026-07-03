@@ -1,12 +1,15 @@
 import { Worker } from "bullmq";
 
 import { env } from "./config/env.js";
+import { db } from "./db/client.js";
+import { assertEmbeddingDims } from "./db/assert.js";
 import { logger } from "./logger.js";
 import { assertNoEviction, createRedis } from "./queue/connection.js";
 import { INGEST_QUEUE, type IngestJobData } from "./queue/ingest.js";
 
 const connection = createRedis(env.REDIS_URL);
 await assertNoEviction(connection);
+await assertEmbeddingDims(db);
 
 const worker = new Worker<IngestJobData>(
   INGEST_QUEUE,
