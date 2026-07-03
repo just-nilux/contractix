@@ -1,0 +1,14 @@
+{
+  "name": "@contractix/eval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Golden-corpus evaluation harness: retrieval, extraction, faithfulness gates",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

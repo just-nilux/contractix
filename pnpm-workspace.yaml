@@ -1,0 +1,16 @@
+packages:
+  - "packages/*"
+
+# pnpm 10 blocks lifecycle scripts by default; allowlist only what genuinely needs them.
+onlyBuiltDependencies:
+  - esbuild
+
+# Single source of truth for versions shared across packages.
+# Exact pins: renovate-style bumps are deliberate commits, and peer-sensitive
+# packages (zod v4, typescript) can never skew between workspace packages.
+catalog:
+  "@types/node": 22.20.0
+  tsx: 4.23.0
+  typescript: 6.0.3
+  vitest: 4.1.9
+  zod: 4.4.3

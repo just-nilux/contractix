@@ -1,0 +1,13 @@
+{
+  "name": "@contractix/rules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic benchmarking & red-flag rules engine (Phase 2)",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

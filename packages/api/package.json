@@ -1,0 +1,17 @@
+{
+  "name": "@contractix/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Contractix HTTP API, ingestion worker, and retrieval services",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@contractix/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

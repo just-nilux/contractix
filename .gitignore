@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+*.tsbuildinfo
+.vite/
+
+# environment & secrets
+.env
+.env.*
+!.env.example
+
+# runtime data (blob storage, local volumes)
+data/
+
+# test artifacts
+coverage/
+
+# OS noise
+.DS_Store
+
+# logs
+*.log
