@@ -103,11 +103,7 @@ export function chunkClause(
     // over budget without paying for an encode of the whole (possibly
     // adversarial) unit.
     const definitelyOver = end - start > maxTokens * 32;
-    if (
-      end <= start ||
-      definitelyOver ||
-      countTokens(clauseText.slice(start, end)) > maxTokens
-    ) {
+    if (end <= start || definitelyOver || countTokens(clauseText.slice(start, end)) > maxTokens) {
       // The single unit [start, nextBoundary) alone exceeds the budget.
       const cut = hardCut(clauseText, start, end <= start ? clauseText.length : end, maxTokens);
       boundaries.splice(endIdx, 0, cut);

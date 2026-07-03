@@ -64,10 +64,6 @@ function createReranker(cfg: ModelsConfig, opts: ProviderFactoryOptions): Rerank
 }
 
 export { type EmbeddingsProvider, type EmbedOptions } from "./embeddings/types.js";
-export {
-  type RerankDoc,
-  type RerankerProvider,
-  type RerankResult,
-} from "./reranker/types.js";
+export { type RerankDoc, type RerankerProvider, type RerankResult } from "./reranker/types.js";
 export { FakeEmbeddings } from "./embeddings/fake.js";
 export { PassthroughReranker } from "./reranker/passthrough.js";

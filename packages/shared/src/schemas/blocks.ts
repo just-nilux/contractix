@@ -50,6 +50,8 @@ export const parseReportSchema = z.object({
   parser: z.string(),
   coverage: z.number().min(0).max(1),
   pages: z.array(pageReportSchema),
+  /** business-level failure reason (low coverage, no clauses, pipeline error) */
+  error: z.string().optional(),
 });
 export type ParseReport = z.infer<typeof parseReportSchema>;
 

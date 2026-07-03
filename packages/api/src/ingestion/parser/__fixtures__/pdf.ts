@@ -32,11 +32,19 @@ export function buildPdf(pages: FixtureLine[][]): Uint8Array {
     pageObjIds.push(pageId);
 
     let autoY = 720;
+    let prevSize: number | null = null;
     const ops: string[] = [];
     for (const line of lines) {
+      // Real layouts give headings vertical breathing room; without it,
+      // mupdf's block detection (correctly) merges adjacent lines into one
+      // paragraph block.
+      if (line.y === undefined && prevSize !== null && prevSize !== line.size) {
+        autoY -= 14;
+      }
       const y = line.y ?? autoY;
       ops.push(`BT /F1 ${line.size} Tf 72 ${y} Td (${escapePdfString(line.text)}) Tj ET`);
       autoY = y - Math.round(line.size * 1.6);
+      prevSize = line.size;
     }
     pageEntries.push({ pageId, contentId, content: ops.join("\n") });
   }

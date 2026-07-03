@@ -29,9 +29,7 @@ function mockFetch(
 ): typeof fetch {
   const fn = (url: unknown, init?: { body?: unknown }) => {
     const body =
-      typeof init?.body === "string"
-        ? (JSON.parse(init.body) as Record<string, unknown>)
-        : {};
+      typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {};
     return Promise.resolve(handler(String(url), body));
   };
   return fn;
@@ -88,9 +86,7 @@ describe("createProviders", () => {
   });
 
   it("throws in production when keys are missing", () => {
-    expect(() => createProviders(cfg, { envVars: {}, production: true })).toThrow(
-      /JINA_API_KEY/,
-    );
+    expect(() => createProviders(cfg, { envVars: {}, production: true })).toThrow(/JINA_API_KEY/);
   });
 });
 

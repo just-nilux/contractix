@@ -15,11 +15,7 @@ export class JinaReranker implements RerankerProvider {
     this.id = `jina:${cfg.model}`;
   }
 
-  async rerank(
-    query: string,
-    docs: readonly RerankDoc[],
-    topK: number,
-  ): Promise<RerankResult[]> {
+  async rerank(query: string, docs: readonly RerankDoc[], topK: number): Promise<RerankResult[]> {
     if (docs.length === 0) return [];
     const res = await postJson<JinaRerankResponse>(
       `${this.cfg.baseUrl}/rerank`,
