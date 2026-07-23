@@ -6,7 +6,8 @@
   "description": "Golden-corpus evaluation harness: retrieval, extraction, faithfulness gates",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "retrieval": "tsx src/retrieval-eval.ts"
+    "retrieval": "tsx src/retrieval-eval.ts",
+    "extraction": "tsx src/extraction-eval.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
