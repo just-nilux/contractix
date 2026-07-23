@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
-import { FakeEmbeddings, PassthroughReranker } from "../providers/index.js";
+import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index.js";
 import { createRedis } from "../queue/connection.js";
 import { createIngestQueue, type IngestQueue } from "../queue/ingest.js";
 import { LocalBlobStore } from "../storage/local.js";
@@ -45,7 +45,11 @@ describe("document upload", () => {
       db,
       blobStore,
       ingestQueue: queue,
-      providers: { embeddings: new FakeEmbeddings(1024), reranker: new PassthroughReranker() },
+      providers: {
+        embeddings: new FakeEmbeddings(1024),
+        reranker: new PassthroughReranker(),
+        llm: new FakeLlm(),
+      },
       maxUploadBytes: 25 * 1024 * 1024,
     };
     app = createApp(deps);

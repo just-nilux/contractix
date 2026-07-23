@@ -3,6 +3,9 @@ import { type ModelsConfig } from "@contractix/shared";
 import { FakeEmbeddings } from "./embeddings/fake.js";
 import { JinaEmbeddings } from "./embeddings/jina.js";
 import { type EmbeddingsProvider } from "./embeddings/types.js";
+import { AnthropicLlm } from "./llm/anthropic.js";
+import { FakeLlm } from "./llm/fake.js";
+import { type LlmProvider } from "./llm/types.js";
 import { JinaReranker } from "./reranker/jina.js";
 import { PassthroughReranker } from "./reranker/passthrough.js";
 import { type RerankerProvider } from "./reranker/types.js";
@@ -10,6 +13,7 @@ import { type RerankerProvider } from "./reranker/types.js";
 export interface ProviderBundle {
   embeddings: EmbeddingsProvider;
   reranker: RerankerProvider;
+  llm: LlmProvider;
 }
 
 export interface ProviderFactoryOptions {
@@ -18,13 +22,14 @@ export interface ProviderFactoryOptions {
   /** Missing keys outside production degrade to fakes; in production they throw. */
   production: boolean;
   /** Called when a real provider silently degrades to a fake (log hook). */
-  onFallback?: (role: "embeddings" | "reranker", reason: string) => void;
+  onFallback?: (role: "embeddings" | "reranker" | "llm", reason: string) => void;
 }
 
 export function createProviders(cfg: ModelsConfig, opts: ProviderFactoryOptions): ProviderBundle {
   return {
     embeddings: createEmbeddings(cfg, opts),
     reranker: createReranker(cfg, opts),
+    llm: createLlm(cfg, opts),
   };
 }
 
@@ -63,7 +68,32 @@ function createReranker(cfg: ModelsConfig, opts: ProviderFactoryOptions): Rerank
   return new JinaReranker({ model: r.model, apiKey, baseUrl: r.base_url });
 }
 
+function createLlm(cfg: ModelsConfig, opts: ProviderFactoryOptions): LlmProvider {
+  // Phase 2 uses the small model for classification/extraction (ADR-0004); the
+  // interface is model-agnostic, so the Phase-3 primary/fallback router slots in
+  // without reshaping it.
+  const l = cfg.llm.primary;
+  const apiKey = opts.envVars[l.api_key_env];
+  if (!apiKey) {
+    if (opts.production) {
+      throw new Error(`llm provider '${l.provider}' requires env ${l.api_key_env}`);
+    }
+    opts.onFallback?.("llm", `missing ${l.api_key_env}`);
+    return new FakeLlm();
+  }
+  return new AnthropicLlm({ model: l.small_model, apiKey });
+}
+
 export { type EmbeddingsProvider, type EmbedOptions } from "./embeddings/types.js";
 export { type RerankDoc, type RerankerProvider, type RerankResult } from "./reranker/types.js";
+export {
+  type JsonSchema,
+  type LlmExtractOptions,
+  type LlmExtractResult,
+  type LlmProvider,
+  type TokenUsage,
+} from "./llm/types.js";
 export { FakeEmbeddings } from "./embeddings/fake.js";
 export { PassthroughReranker } from "./reranker/passthrough.js";
+export { AnthropicLlm } from "./llm/anthropic.js";
+export { FakeLlm } from "./llm/fake.js";

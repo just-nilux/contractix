@@ -12,7 +12,7 @@ import { ensureDevTenant } from "../db/tenancy.js";
 import { type AppDeps } from "../deps.js";
 import { buildPdf } from "../ingestion/parser/__fixtures__/pdf.js";
 import { runIngestion } from "../ingestion/pipeline.js";
-import { FakeEmbeddings, PassthroughReranker } from "../providers/index.js";
+import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index.js";
 import { createRedis } from "../queue/connection.js";
 import { createIngestQueue } from "../queue/ingest.js";
 import { LocalBlobStore } from "../storage/local.js";
@@ -65,7 +65,7 @@ describe("search and clause routes", () => {
       db,
       blobStore,
       ingestQueue: createIngestQueue(redis),
-      providers: { embeddings, reranker: new PassthroughReranker() },
+      providers: { embeddings, reranker: new PassthroughReranker(), llm: new FakeLlm() },
       maxUploadBytes: 25 * 1024 * 1024,
     };
     app = createApp(deps);
