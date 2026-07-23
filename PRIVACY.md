@@ -15,7 +15,7 @@ sensitive by default.
 | Anonymization pre-pass (NER redaction) before external model calls                     | Phase 4                                                                                                                     |
 | Retention: user-settable, default 30 days; hard delete incl. embeddings & log payloads | schema carries `retention_days`; deletion job lands in Phase 4                                                              |
 | At-rest encryption for file storage; TLS everywhere                                    | deploy-time (Phase 3/4)                                                                                                     |
-| Document text is data, never instructions (prompt-injection posture)                   | extraction sends clauses as delimited data with no tools (Phase 2); agent-loop enforcement Phase 3, injection suite Phase 4 |
+| Document text is data, never instructions (prompt-injection posture)                   | extraction sends clauses as delimited data; document text cannot invoke tools, and only the forced schema-output tool is available (Phase 2); agent-loop enforcement Phase 3, injection suite Phase 4 |
 
 ## External model providers
 
