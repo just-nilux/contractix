@@ -4,3 +4,6 @@ export * from "./cases.js";
 export * from "./documents.js";
 export * from "./clauses.js";
 export * from "./chunks.js";
+export * from "./extractions.js";
+export * from "./citations.js";
+export * from "./flags.js";
