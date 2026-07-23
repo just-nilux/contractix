@@ -16,11 +16,17 @@ export {
 export {
   createProviders,
   FakeEmbeddings,
+  FakeLlm,
   PassthroughReranker,
   type EmbeddingsProvider,
   type EmbedOptions,
+  type JsonSchema,
+  type LlmExtractOptions,
+  type LlmExtractResult,
+  type LlmProvider,
   type ProviderBundle,
   type RerankerProvider,
+  type TokenUsage,
 } from "./providers/index.js";
 export {
   searchClauses,

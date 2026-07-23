@@ -64,3 +64,18 @@ export function parseClauseId(serialized: string): ParsedClauseId {
   clausePathSchema.parse(clausePath);
   return { documentId, page, clausePath, clauseRef: `${page}:${clausePath}` };
 }
+
+/**
+ * The serialized clause id `"{documentId}:{page}:{clause_path}"` carried by
+ * citation markers (FR-1.4). Validates through `parseClauseId`, so it can never
+ * diverge from the parser. Reused wherever a citation names a clause
+ * (extraction `citations[]`, agent `[[clause_id]]` markers, eval gold).
+ */
+export const clauseIdSchema = z.string().refine((s) => {
+  try {
+    parseClauseId(s);
+    return true;
+  } catch {
+    return false;
+  }
+}, "clause_id must be '{documentId}:{page}:{clause_path}'");
