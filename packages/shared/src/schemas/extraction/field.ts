@@ -53,3 +53,20 @@ export function notFound(): {
     status: "not_found",
   };
 }
+
+/**
+ * Runtime shape of a single cited field, for code that iterates an extraction
+ * without knowing the family at compile time (the extraction service persisting
+ * rows, the eval scoring fields). The Zod family schemas guarantee this shape.
+ */
+export interface CitedFieldValue {
+  value: unknown;
+  unit?: string;
+  confidence: Confidence;
+  citations: string[];
+  verbatim_anchor: string;
+  status: ExtractionStatus;
+}
+
+/** A validated extraction as a field map (fieldPath -> cited value). */
+export type ExtractedFields = Record<string, CitedFieldValue>;

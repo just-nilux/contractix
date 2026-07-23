@@ -35,3 +35,15 @@ export {
   type SearchResultItem,
 } from "./retrieval/search-service.js";
 export { extensionForMime, LocalBlobStore } from "./storage/local.js";
+export {
+  runExtraction,
+  type ExtractionDeps,
+  type ExtractionParams,
+  type ExtractionResult,
+} from "./extraction/extraction-service.js";
+export {
+  resolveFieldCitations,
+  type ClauseForCitation,
+  type ResolvedCitation,
+  type ResolvedField,
+} from "./extraction/citation-resolver.js";

@@ -37,6 +37,8 @@ export interface ExtractionSchemaRef {
   /** `${family}@${version}` — persisted as extractions.schema_ver. */
   schemaVer: string;
   schema: z.ZodType;
+  /** The family's field names, in declaration order (used for the total-failure path). */
+  fieldKeys: string[];
 }
 
 /** Resolve the extraction schema + versioned id for a document type, or null if none applies. */
@@ -49,5 +51,6 @@ export function extractionSchemaForType(type: DocumentType): ExtractionSchemaRef
     version: entry.version,
     schemaVer: `${family}@${entry.version}`,
     schema: entry.schema,
+    fieldKeys: Object.keys(entry.schema.shape),
   };
 }
