@@ -6,7 +6,14 @@
 
 ## Status
 
-🚧 **Phase 0/1 — ingestion & retrieval under construction.** See [PRD.md](PRD.md) for the full specification and roadmap.
+**Phases 0–2 complete** — the ingestion + retrieval spine and the extraction + red-flag engine are built and tested. Phase 3 (agentic Q&A, full report, web UI) is next. See [PRD.md](PRD.md) for the full specification and roadmap.
+
+- **Ingestion & retrieval** — layout-aware PDF/DOCX parse → clause segmentation → chunking → pgvector + full-text + trigram hybrid search with cross-encoder rerank.
+- **Extraction** — schema-first, per-field-cited extraction (employment offers/contracts, VSOP/ESOP, term sheets); every field carries a structural citation to the exact clause span, and `not_found` is a first-class value, never inferred.
+- **Red-flag engine** — 31 deterministic, versioned rules over the extracted schema (e.g. sub-50% Karenzentschädigung, >1× / participating liquidation preference, bad-leaver forfeiture), each citing the clause(s) that triggered it.
+- **Evals** — retrieval (recall@8 / MRR) and extraction (field accuracy, `not_found` precision, citation recall) harnesses, gated in CI.
+
+> Runs fully offline in **keyless mode** (deterministic fake providers) — `pnpm test` and CI need no API keys. Real extraction/retrieval and the eval baselines require provider keys; see [`.env.example`](.env.example).
 
 ## Documentation
 

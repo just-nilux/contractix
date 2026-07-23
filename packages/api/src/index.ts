@@ -16,11 +16,17 @@ export {
 export {
   createProviders,
   FakeEmbeddings,
+  FakeLlm,
   PassthroughReranker,
   type EmbeddingsProvider,
   type EmbedOptions,
+  type JsonSchema,
+  type LlmExtractOptions,
+  type LlmExtractResult,
+  type LlmProvider,
   type ProviderBundle,
   type RerankerProvider,
+  type TokenUsage,
 } from "./providers/index.js";
 export {
   searchClauses,
@@ -29,3 +35,21 @@ export {
   type SearchResultItem,
 } from "./retrieval/search-service.js";
 export { extensionForMime, LocalBlobStore } from "./storage/local.js";
+export {
+  runExtraction,
+  type ExtractionDeps,
+  type ExtractionParams,
+  type ExtractionResult,
+} from "./extraction/extraction-service.js";
+export {
+  resolveFieldCitations,
+  type ClauseForCitation,
+  type ResolvedCitation,
+  type ResolvedField,
+} from "./extraction/citation-resolver.js";
+export {
+  benchmarkDocument,
+  type BenchmarkDeps,
+  type BenchmarkParams,
+  type PersistedFlag,
+} from "./extraction/benchmark-service.js";

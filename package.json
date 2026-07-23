@@ -23,7 +23,9 @@
     "db:migrate": "pnpm --filter @contractix/api db:migrate",
     "corpus:generate": "tsx scripts/generate-corpus.ts",
     "seed:demo": "pnpm --filter @contractix/api seed:demo",
-    "eval:retrieval": "pnpm --filter @contractix/eval retrieval"
+    "demo:extract": "pnpm --filter @contractix/api demo:extract",
+    "eval:retrieval": "pnpm --filter @contractix/eval retrieval",
+    "eval:extraction": "pnpm --filter @contractix/eval extraction"
   },
   "devDependencies": {
     "@types/node": "catalog:",

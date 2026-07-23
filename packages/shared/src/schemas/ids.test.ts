@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildClauseRef, parseClauseId, serializeClauseId } from "./ids.js";
+import { buildClauseRef, clauseIdSchema, parseClauseId, serializeClauseId } from "./ids.js";
 
 const DOC_ID = "0197a3b2-1c4d-7e5f-8a9b-0c1d2e3f4a5b";
 
@@ -38,5 +38,13 @@ describe("clause ref helpers", () => {
     expect(() => parseClauseId(`${DOC_ID}:0:§1`)).toThrow();
     expect(() => parseClauseId(`${DOC_ID}:abc:§1`)).toThrow();
     expect(() => parseClauseId(DOC_ID)).toThrow();
+  });
+
+  it("clauseIdSchema accepts serialized ids and rejects refs/garbage", () => {
+    expect(clauseIdSchema.safeParse(`${DOC_ID}:2:§11`).success).toBe(true);
+    expect(clauseIdSchema.safeParse(`${DOC_ID}:3:anlage-1/2.1`).success).toBe(true);
+    expect(clauseIdSchema.safeParse("2:§11").success).toBe(false);
+    expect(clauseIdSchema.safeParse(`${DOC_ID}:0:§1`).success).toBe(false);
+    expect(clauseIdSchema.safeParse("nope").success).toBe(false);
   });
 });

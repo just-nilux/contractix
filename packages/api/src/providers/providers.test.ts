@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { FakeEmbeddings } from "./embeddings/fake.js";
 import { JinaEmbeddings } from "./embeddings/jina.js";
 import { createProviders } from "./index.js";
+import { AnthropicLlm } from "./llm/anthropic.js";
+import { FakeLlm } from "./llm/fake.js";
 import { JinaReranker } from "./reranker/jina.js";
 import { PassthroughReranker } from "./reranker/passthrough.js";
 
@@ -68,12 +70,15 @@ describe("FakeEmbeddings", () => {
 describe("createProviders", () => {
   it("uses real providers when keys are present", () => {
     const bundle = createProviders(cfg, {
-      envVars: { JINA_API_KEY: "k" },
+      envVars: { JINA_API_KEY: "k", ANTHROPIC_API_KEY: "k" },
       production: false,
     });
     expect(bundle.embeddings).toBeInstanceOf(JinaEmbeddings);
     expect(bundle.embeddings.id).toBe("jina:test-embed@32");
     expect(bundle.reranker).toBeInstanceOf(JinaReranker);
+    expect(bundle.llm).toBeInstanceOf(AnthropicLlm);
+    // Extraction binds to the small model (ADR-0004), not the primary.
+    expect(bundle.llm.id).toBe("anthropic:b");
   });
 
   it("degrades to fakes without keys outside production, with a fallback hook", () => {
@@ -81,12 +86,20 @@ describe("createProviders", () => {
     const bundle = createProviders(cfg, { envVars: {}, production: false, onFallback });
     expect(bundle.embeddings).toBeInstanceOf(FakeEmbeddings);
     expect(bundle.reranker).toBeInstanceOf(PassthroughReranker);
+    expect(bundle.llm).toBeInstanceOf(FakeLlm);
     expect(onFallback).toHaveBeenCalledWith("embeddings", "missing JINA_API_KEY");
     expect(onFallback).toHaveBeenCalledWith("reranker", "missing JINA_API_KEY");
+    expect(onFallback).toHaveBeenCalledWith("llm", "missing ANTHROPIC_API_KEY");
   });
 
-  it("throws in production when keys are missing", () => {
+  it("throws in production when the embeddings key is missing", () => {
     expect(() => createProviders(cfg, { envVars: {}, production: true })).toThrow(/JINA_API_KEY/);
+  });
+
+  it("throws in production when the llm key is missing", () => {
+    expect(() =>
+      createProviders(cfg, { envVars: { JINA_API_KEY: "k" }, production: true }),
+    ).toThrow(/ANTHROPIC_API_KEY/);
   });
 });
 
@@ -186,5 +199,108 @@ describe("JinaReranker", () => {
     );
     expect(await reranker.rerank("q", [], 8)).toEqual([]);
     expect(called).toBe(0);
+  });
+});
+
+describe("AnthropicLlm", () => {
+  it("forces the tool and returns its input plus token usage", async () => {
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    const fetchFn = mockFetch((url, body) => {
+      calls.push({ url, body });
+      return new Response(
+        JSON.stringify({
+          content: [
+            { type: "text", text: "narration the model should not add" },
+            { type: "tool_use", name: "record_extraction", input: { ok: true } },
+          ],
+          usage: { input_tokens: 11, output_tokens: 7 },
+        }),
+        { status: 200 },
+      );
+    });
+    const llm = new AnthropicLlm({ model: "claude-haiku", apiKey: "k" }, { fetchFn });
+
+    const res = await llm.extract({
+      system: "sys",
+      user: "clause-structured document",
+      toolName: "record_extraction",
+      jsonSchema: { type: "object" },
+    });
+
+    expect(res.json).toEqual({ ok: true });
+    expect(res.usage).toEqual({ inputTokens: 11, outputTokens: 7 });
+    expect(llm.id).toBe("anthropic:claude-haiku");
+    expect(calls[0]?.url).toBe("https://api.anthropic.com/v1/messages");
+    expect(calls[0]?.body.tool_choice).toEqual({ type: "tool", name: "record_extraction" });
+    expect(calls[0]?.body.temperature).toBe(0);
+  });
+
+  it("throws when the forced tool_use block is absent", async () => {
+    const fetchFn = mockFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "no tool call" }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+          { status: 200 },
+        ),
+    );
+    const llm = new AnthropicLlm({ model: "m", apiKey: "k" }, { fetchFn });
+    await expect(
+      llm.extract({ system: "s", user: "u", toolName: "record_extraction", jsonSchema: {} }),
+    ).rejects.toThrow(/tool_use/);
+  });
+});
+
+describe("FakeLlm", () => {
+  it("returns a deterministic, schema-valid not_found object", async () => {
+    const llm = new FakeLlm();
+    const jsonSchema = {
+      type: "object",
+      properties: {
+        document_type: { const: "employment_offer" },
+        base_salary: {
+          type: "object",
+          properties: {
+            value: { anyOf: [{ type: "number" }, { type: "null" }] },
+            confidence: { enum: ["high", "medium", "low"] },
+            status: { enum: ["extracted", "not_found", "extraction_failed"] },
+            citations: { type: "array", items: { type: "string" } },
+            verbatim_anchor: { type: "string" },
+          },
+        },
+      },
+    };
+
+    const a = await llm.extract({ system: "s", user: "u", toolName: "t", jsonSchema });
+    const b = await llm.extract({ system: "s", user: "different doc", toolName: "t", jsonSchema });
+
+    expect(a.json).toEqual(b.json);
+    expect(a.json).toEqual({
+      document_type: "employment_offer",
+      base_salary: {
+        value: null,
+        confidence: "low",
+        status: "not_found",
+        citations: [],
+        verbatim_anchor: "",
+      },
+    });
+    expect(a.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
+    expect(llm.id).toBe("fake:llm");
+  });
+
+  it("resolves $ref against $defs (Zod 4 reused-schema output)", async () => {
+    const llm = new FakeLlm();
+    const jsonSchema = {
+      type: "object",
+      properties: { field: { $ref: "#/$defs/Cited" } },
+      $defs: {
+        Cited: { type: "object", properties: { status: { enum: ["extracted", "not_found"] } } },
+      },
+    };
+    const res = await llm.extract({ system: "s", user: "u", toolName: "t", jsonSchema });
+    expect(res.json).toEqual({ field: { status: "not_found" } });
   });
 });

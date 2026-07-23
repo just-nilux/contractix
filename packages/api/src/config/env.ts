@@ -20,6 +20,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1).default("redis://localhost:6380"),
   STORAGE_DIR: z.string().min(1).default("./data/files"),
   JINA_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
   EVAL_ALLOW_LIVE_PROVIDERS: z
     .enum(["true", "false"])
     .default("false")
