@@ -4,8 +4,19 @@
   "private": true,
   "type": "module",
   "description": "Deterministic benchmarking & red-flag rules engine (Phase 2)",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@contractix/shared": "workspace:*",
+    "yaml": "^2.8.2",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

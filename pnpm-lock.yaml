@@ -177,6 +177,16 @@ importers:
         version: 6.0.3
 
   packages/rules:
+    dependencies:
+      '@contractix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      yaml:
+        specifier: ^2.8.2
+        version: 2.9.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: 'catalog:'

@@ -1,3 +1,10 @@
-// Versioned YAML rule files + deterministic checks over extracted schemas (PRD FR-4).
-// Implementation lands in Phase 2.
-export {};
+export { loadRules, rulesetVersion, runBenchmark } from "./engine.js";
+export { CHECKS } from "./checks.js";
+export {
+  type CheckFn,
+  type Flag,
+  type Rule,
+  type RuleContext,
+  type RuleMeta,
+  type Severity,
+} from "./types.js";

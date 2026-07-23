@@ -1,0 +1,269 @@
+# Versioned red-flag rule metadata (PRD FR-4). Copy + applicability live here;
+# the deterministic checks live in checks.ts, joined by id in engine.ts.
+# Statutory references are pointers, not legal determinations (PRD FR-7.6).
+# Bump `version` on any change and re-baseline the eval (chore(eval)).
+version: "1"
+
+rules:
+  # --- Employment ---
+  - id: DE-NONCOMP-KARENZ
+    applies_to: [employment_offer, employment_contract]
+    severity: red
+    rationale: >
+      A post-contractual non-compete binds only with Karenzentschädigung of at least
+      50% of last remuneration (§74 Abs. 2 HGB); below that the covenant is
+      unenforceable yet may still deter, leaving the employee restrained without pay.
+    negotiation_hint: Require at least 50% Karenzentschädigung or strike the non-compete.
+    sources: ["§74 HGB"]
+
+  - id: DE-NONCOMP-DURATION
+    applies_to: [employment_offer, employment_contract]
+    severity: amber
+    rationale: >
+      A post-contractual non-compete may not exceed two years (§74a Abs. 1 HGB);
+      a longer term is void for the excess.
+    negotiation_hint: Cap the non-compete at 24 months.
+    sources: ["§74a HGB"]
+
+  - id: DE-PROBEZEIT-MAX
+    applies_to: [employment_offer, employment_contract]
+    severity: red
+    rationale: >
+      A probationary period beyond six months exceeds the statutory ceiling for a
+      Probezeit with shortened notice (§622 Abs. 3 BGB).
+    negotiation_hint: Reduce the Probezeit to a maximum of six months.
+    sources: ["§622 BGB"]
+
+  - id: EMP-CONTRACT-BEFRISTET
+    applies_to: [employment_offer, employment_contract]
+    severity: info
+    rationale: >
+      A fixed-term contract without objective grounds is limited to two years
+      (§14 Abs. 2 TzBfG) and ends without protection against dismissal.
+    sources: ["§14 TzBfG"]
+
+  - id: EMP-NOTICE-ASYM
+    applies_to: [employment_offer, employment_contract]
+    severity: amber
+    rationale: >
+      A longer notice period for the employee than the employer is invalid — the
+      employee's notice may not exceed the employer's (§622 Abs. 6 BGB).
+    negotiation_hint: Make notice periods symmetric or shorter for the employee.
+    sources: ["§622 BGB"]
+
+  - id: EMP-IP-NOCARVEOUT
+    applies_to: [employment_offer, employment_contract]
+    severity: amber
+    rationale: >
+      A full IP assignment with no carve-out captures personal and open-source side
+      projects, not only work created for the employer.
+    negotiation_hint: Add a written carve-out for pre-existing and personal side projects.
+    sources: ["ArbnErfG"]
+
+  - id: EMP-CONFIDENTIALITY-INDEF
+    applies_to: [employment_offer, employment_contract]
+    severity: info
+    rationale: An indefinite post-termination confidentiality duty is broad and hard to bound.
+    sources: []
+
+  - id: EMP-CLAWBACK-SIGNING
+    applies_to: [employment_offer, employment_contract]
+    severity: amber
+    rationale: >
+      A signing bonus fully clawed back on resignation within a year functions as a
+      stay incentive and reduces effective first-year compensation.
+    negotiation_hint: Shorten the clawback window or prorate it monthly.
+    sources: []
+
+  - id: EMP-BONUS-DISCRETIONARY
+    applies_to: [employment_offer, employment_contract]
+    severity: info
+    rationale: A purely discretionary bonus is not a guaranteed component of compensation.
+    sources: []
+
+  - id: EMP-OVERTIME-UNPAID
+    applies_to: [employment_offer, employment_contract]
+    severity: amber
+    rationale: >
+      Overtime treated as covered by salary is uncompensated; blanket clauses are only
+      valid within reasonable limits.
+    negotiation_hint: Cap included overtime or agree separate compensation/time off.
+    sources: []
+
+  - id: EMP-VACATION-LOW
+    applies_to: [employment_offer, employment_contract]
+    severity: info
+    rationale: >
+      Fewer than 25 vacation days is below the common market level, though above the
+      statutory minimum (§3 BUrlG).
+    sources: ["§3 BUrlG"]
+
+  - id: EMP-EQUITY-DEFERRED
+    applies_to: [employment_offer, employment_contract]
+    severity: info
+    rationale: >
+      Equity is granted but the vesting, leaver and payout terms are deferred to a
+      separate VSOP/ESOP contract not evaluated here — review it before relying on the grant.
+    sources: []
+
+  # --- Equity (employment + VSOP) ---
+  - id: EQ-VEST-STD
+    applies_to: [employment_offer, employment_contract, vsop_esop_agreement]
+    severity: amber
+    rationale: >
+      Vesting deviates from the 4-year / 1-year-cliff market standard; confirm the
+      schedule is intended and not unusually long or back-loaded.
+    negotiation_hint: Align vesting to 48 months with a 12-month cliff unless justified.
+    sources: []
+
+  # --- Term sheet ---
+  - id: TS-LIQPREF-GT1X
+    applies_to: [term_sheet]
+    severity: red
+    rationale: >
+      A liquidation preference above 1x pays investors a multiple of their money before
+      common holders, sharply reducing founder/employee proceeds in modest exits.
+    negotiation_hint: Push for a 1x preference.
+    sources: []
+
+  - id: TS-LIQPREF-PARTICIPATING
+    applies_to: [term_sheet]
+    severity: amber
+    rationale: >
+      A participating preference lets investors take their preference and then share
+      pro-rata in the remainder (double-dip).
+    negotiation_hint: Seek non-participating, or at least a low participation cap.
+    sources: []
+
+  - id: TS-LIQPREF-UNCAPPED
+    applies_to: [term_sheet]
+    severity: red
+    rationale: An uncapped participating preference has no ceiling on the investor double-dip.
+    negotiation_hint: Add a participation cap (e.g. 2x) or make it non-participating.
+    sources: []
+
+  - id: TS-FULLRATCHET
+    applies_to: [term_sheet]
+    severity: red
+    rationale: >
+      Full-ratchet anti-dilution reprices the entire prior round to any lower down-round
+      price, maximally diluting founders and employees.
+    negotiation_hint: Replace with broad-based weighted-average anti-dilution.
+    sources: []
+
+  - id: TS-ANTIDILUTION-WA
+    applies_to: [term_sheet]
+    severity: info
+    rationale: Weighted-average anti-dilution is present — the market-standard, milder form.
+    sources: []
+
+  - id: TS-ESOP-PREMONEY
+    applies_to: [term_sheet]
+    severity: info
+    rationale: >
+      An ESOP pool created pre-money dilutes existing shareholders (founders) rather than
+      the incoming investor; the effective pre-money is lower than headline.
+    sources: []
+
+  - id: TS-ESOP-LARGE
+    applies_to: [term_sheet]
+    severity: amber
+    rationale: An option pool of 15% or more is large and, if pre-money, heavily founder-dilutive.
+    negotiation_hint: Right-size the pool to the actual hiring plan.
+    sources: []
+
+  - id: TS-BOARD-INVESTOR-CONTROL
+    applies_to: [term_sheet]
+    severity: amber
+    rationale: >
+      Investors hold at least as many board seats as founders; founders no longer control
+      the board at this stage.
+    negotiation_hint: Keep a founder-majority or independent-swing board.
+    sources: []
+
+  - id: TS-DRAG-LOW
+    applies_to: [term_sheet]
+    severity: amber
+    rationale: >
+      A drag-along threshold below ~66% lets a narrow majority force a sale on all
+      shareholders.
+    negotiation_hint: Raise the drag threshold and require a founder/common consent.
+    sources: []
+
+  - id: TS-FOUNDER-REVEST
+    applies_to: [term_sheet]
+    severity: info
+    rationale: >
+      Founder shares are subject to reverse vesting; leaving early forfeits unvested
+      founder equity.
+    sources: []
+
+  - id: TS-NOSHOP-LONG
+    applies_to: [term_sheet]
+    severity: amber
+    rationale: >
+      An exclusivity / no-shop period beyond ~45 days locks the company out of alternative
+      financing for a long stretch during diligence.
+    negotiation_hint: Shorten the no-shop and tie it to diligence milestones.
+    sources: []
+
+  - id: TS-DIVIDEND-CUMULATIVE
+    applies_to: [term_sheet]
+    severity: amber
+    rationale: >
+      Cumulative dividends accrue over time and are paid ahead of common at exit,
+      compounding the preference.
+    negotiation_hint: Make dividends non-cumulative and only when declared.
+    sources: []
+
+  # --- VSOP / ESOP ---
+  - id: EQ-BADLEAVER-BROAD
+    applies_to: [vsop_esop_agreement]
+    severity: red
+    rationale: >
+      Vested virtual options are forfeited on a bad-leaver event; combined with a broad
+      bad-leaver definition (e.g. ordinary resignation) this can void already-earned value.
+    negotiation_hint: Protect vested options on any non-cause departure.
+    sources: []
+
+  - id: EQ-VSOP-EXITONLY
+    applies_to: [vsop_esop_agreement]
+    severity: amber
+    rationale: >
+      Payout occurs only on a narrowly defined exit and at the board's discretion, so
+      vested options may never pay out absent a qualifying, board-approved event.
+    negotiation_hint: Broaden the payout triggers and constrain board discretion.
+    sources: []
+
+  - id: EQ-VSOP-EXIT-NARROW
+    applies_to: [vsop_esop_agreement]
+    severity: amber
+    rationale: >
+      Financing rounds and reorganizations are excluded from the exit definition, so
+      common liquidity events do not trigger a payout.
+    negotiation_hint: Include secondary sales / financing-round liquidity in the exit definition.
+    sources: []
+
+  - id: EQ-VSOP-NODILUTION
+    applies_to: [vsop_esop_agreement]
+    severity: info
+    rationale: >
+      The virtual pool is not adjusted for future financing rounds or pool increases; the
+      beneficiary bears the full dilution.
+    sources: []
+
+  - id: EQ-VSOP-CASHSETTLE
+    applies_to: [vsop_esop_agreement]
+    severity: info
+    rationale: >
+      The instrument is cash-settled virtual options — a contractual payment claim, not
+      real shares, with no voting or dividend rights.
+    sources: []
+
+  - id: EQ-VSOP-BASEPRICE
+    applies_to: [vsop_esop_agreement]
+    severity: info
+    rationale: >
+      Options carry a base/strike price that is subtracted from the payout, reducing the
+      net amount per option at exit.
+    sources: []
