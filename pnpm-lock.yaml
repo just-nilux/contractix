@@ -68,6 +68,9 @@ importers:
 
   packages/api:
     dependencies:
+      '@contractix/rules':
+        specifier: workspace:*
+        version: link:../rules
       '@contractix/shared':
         specifier: workspace:*
         version: link:../shared

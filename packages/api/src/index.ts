@@ -47,3 +47,9 @@ export {
   type ResolvedCitation,
   type ResolvedField,
 } from "./extraction/citation-resolver.js";
+export {
+  benchmarkDocument,
+  type BenchmarkDeps,
+  type BenchmarkParams,
+  type PersistedFlag,
+} from "./extraction/benchmark-service.js";

@@ -11,9 +11,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "dev:worker": "tsx watch src/worker.ts",
-    "seed:demo": "tsx src/scripts/seed-demo.ts"
+    "seed:demo": "tsx src/scripts/seed-demo.ts",
+    "demo:extract": "tsx src/scripts/extract-demo.ts"
   },
   "dependencies": {
+    "@contractix/rules": "workspace:*",
     "@contractix/shared": "workspace:*",
     "@hono/node-server": "^2.0.8",
     "@hono/zod-openapi": "^1.4.0",
