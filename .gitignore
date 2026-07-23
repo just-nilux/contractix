@@ -1,8 +1,10 @@
 # dependencies
 node_modules/
 
-# builds
+# builds (package build outputs; the sha-pinned golden corpus/dist is committed)
 dist/
+!corpus/dist/
+!corpus/dist/**
 *.tsbuildinfo
 .vite/
 
