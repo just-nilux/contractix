@@ -35,16 +35,20 @@ describe("extraction family schemas", () => {
     expect(employmentExtractionSchema.safeParse(doc).success).toBe(true);
   });
 
-  it("reject a citation that is a clause_ref rather than a full clause_id", () => {
+  it("accepts a loosely-formatted citation string (resolved structurally, ADR-0007)", () => {
+    // Citations are model HINTS, not schema-validated clause ids: a small model
+    // rarely echoes the full "{uuid}:{page}:{path}" id, and a strict schema once
+    // failed the whole extraction over one bad id. The schema now accepts any
+    // string; citation-resolver.ts grounds it via verbatim_anchor at resolve time.
     const doc = allNotFound(employmentExtractionSchema);
     doc.probation_period_months = {
       value: 6,
       confidence: "high",
-      citations: ["1:§2"],
-      verbatim_anchor: "x",
+      citations: ["1:§2", "§2"],
+      verbatim_anchor: "Die Probezeit beträgt sechs Monate.",
       status: "extracted",
     };
-    expect(employmentExtractionSchema.safeParse(doc).success).toBe(false);
+    expect(employmentExtractionSchema.safeParse(doc).success).toBe(true);
   });
 });
 
