@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { clauseIdSchema } from "../ids.js";
-
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
 export type Confidence = z.infer<typeof confidenceSchema>;
 
@@ -31,7 +29,14 @@ export function citedValue<T extends z.ZodType>(value: T) {
     value: value.nullable(),
     unit: z.string().optional(),
     confidence: confidenceSchema,
-    citations: z.array(clauseIdSchema),
+    // Citations are model-provided HINTS, resolved structurally downstream
+    // (citation-resolver.ts; ADR-0006/0007) by locating verbatim_anchor in the
+    // clause's frozen text — never by trusting the id's format. We accept any
+    // string, not clauseIdSchema: a small model rarely echoes the long
+    // "{uuid}:{page}:{path}" id verbatim, and a strict schema turned one bad id
+    // into a whole-document extraction failure (the exact defect the live eval
+    // caught). Format is validated at resolve time, where a bad id is tolerated.
+    citations: z.array(z.string()),
     verbatim_anchor: z.string(),
     status: extractionStatusSchema,
   });

@@ -65,4 +65,60 @@ describe("resolveFieldCitations", () => {
     expect(citations).toEqual([]);
     expect(unresolved).toEqual([foreign, unknown]);
   });
+
+  it("resolves via the anchor even when the model's clause id is malformed (ADR-0007)", () => {
+    // A small model returns the right verbatim_anchor but citation ids it never
+    // reproduced exactly — anchor-first resolution still grounds the value.
+    const anchor = "12 Monate";
+    const { citations, unresolved } = resolveFieldCitations(
+      { citations: ["§11", "not-a-clause-id"], verbatim_anchor: anchor },
+      byRef,
+      DOC_ID,
+    );
+    expect(unresolved).toEqual([]);
+    expect(citations).toHaveLength(1);
+    const c = citations[0]!;
+    expect(c.clauseId).toBe("row-1");
+    expect(clause.text.slice(c.charStart - clause.charStart, c.charEnd - clause.charStart)).toBe(
+      anchor,
+    );
+  });
+
+  it("does not guess when an anchor is ambiguous across clauses without a hint", () => {
+    const cA: ClauseForCitation = {
+      id: "a",
+      clauseRef: "1:§1",
+      charStart: 0,
+      charEnd: 24,
+      text: "Vesting 48 months total.",
+    };
+    const cB: ClauseForCitation = {
+      id: "b",
+      clauseRef: "1:§2",
+      charStart: 100,
+      charEnd: 120,
+      text: "Cliff 48 months min.",
+    };
+    const twoClauses = new Map([
+      [cA.clauseRef, cA],
+      [cB.clauseRef, cB],
+    ]);
+
+    // Ambiguous anchor, no usable hint -> unresolved (never fuzzy-guess, ADR-0005).
+    const ambiguous = resolveFieldCitations(
+      { citations: [], verbatim_anchor: "48 months" },
+      twoClauses,
+      DOC_ID,
+    );
+    expect(ambiguous.citations).toEqual([]);
+
+    // Same anchor, but the model hints the second clause -> resolves there.
+    const hinted = resolveFieldCitations(
+      { citations: [serializeClauseId(DOC_ID, cB.clauseRef)], verbatim_anchor: "48 months" },
+      twoClauses,
+      DOC_ID,
+    );
+    expect(hinted.citations).toHaveLength(1);
+    expect(hinted.citations[0]!.clauseId).toBe("b");
+  });
 });
