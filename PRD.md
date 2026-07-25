@@ -8,7 +8,7 @@
 
 Contractix is a production, agentic document-diligence system for founders, senior engineers, and angel investors evaluating **employment offers, VSOP/ESOP agreements, and startup term sheets** (German + English). The user uploads one or more documents; the system extracts every material term into a typed schema, benchmarks each term against market standards and statutory norms (DE/EU-aware), answers free-form questions via an agentic RAG loop, and produces a **red-flag report where every claim carries a citation to the exact page and clause**.
 
-**Strategic purpose (equally important as the product itself):** produce demonstrable, live, production evidence of shipping LLM + RAG + agent systems over documents — with a CI eval harness, cost/latency instrumentation, citation enforcement, and human-review UX. Every architectural choice below is made to be defensible in a senior AI-engineer interview.
+**Strategic purpose (equally important as the product itself):** produce demonstrable, live, production evidence of shipping LLM + RAG + agent systems over documents — with a CI eval harness, cost/latency instrumentation, citation enforcement, and human-review UX.
 
 **Non-goal framing:** this is not legal advice and must say so. It is decision support with verifiable citations.
 
@@ -194,7 +194,7 @@ These documents contain salary and identity data — treat as sensitive by defau
 [Prometheus + Grafana + uptime-kuma]   [pino → Loki (optional)]
 ```
 
-**Pinned choices & rationale (interview-defensible):**
+**Pinned choices & rationale:**
 
 | Concern | Choice | Why / alternative |
 |---|---|---|
@@ -204,7 +204,7 @@ These documents contain salary and identity data — treat as sensitive by defau
 | DB / vectors | Postgres 17 + pgvector | Deep existing PG expertise; RRF hybrid in SQL; one backup story. Qdrant only if corpus scale demands (it won't in v1) |
 | Queue | BullMQ + Redis | Already operated; parse jobs are minutes-long |
 | Models | Provider-router: frontier model for agent/report, small model for classify/extract-repair; embeddings + reranker behind interfaces | Same dual-provider pattern as prediction-market-bot; pin exact model IDs in `models.yaml`, re-verify at build start |
-| Agent loop | Hand-rolled tool loop (existing pattern) — *not* LangChain/LlamaIndex | Full control over grounding contract, budgets, tracing; frameworks add opacity you'd have to explain away in interviews |
+| Agent loop | Hand-rolled tool loop (existing pattern) — *not* LangChain/LlamaIndex | Full control over grounding contract, budgets, tracing |
 | Frontend | React 19 + Vite + Tailwind v4; `react-pdf` viewer with span highlighting | Existing stack |
 | Deploy | Docker Compose on Hetzner VPS (EU), Caddy, systemd, Borg backups; GH Actions CI/CD with smoke test + dry-run deploy | Existing ops playbook |
 
