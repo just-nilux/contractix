@@ -21,9 +21,7 @@ const severitySchema = z.enum(["red", "amber", "info"]);
 
 export const goldFlagSchema = z.object({
   doc: z.string().min(1),
-  expected: z
-    .array(z.object({ ruleId: z.string().min(1), severity: severitySchema }))
-    .default([]),
+  expected: z.array(z.object({ ruleId: z.string().min(1), severity: severitySchema })).default([]),
   notExpected: z.array(z.string().min(1)).default([]),
 });
 export type GoldFlags = z.infer<typeof goldFlagSchema>;

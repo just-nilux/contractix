@@ -35,7 +35,7 @@ from `verbatim_anchor`, never by trusting model-authored ids.
 1. **The extraction schema accepts any string citation.** `citedValue.citations`
    is `z.array(z.string())`, not `z.array(clauseIdSchema)`. Model citations are
    **hints**, not a validation gate — their format never fails the extraction.
-   (`clauseIdSchema` remains the contract everywhere *our* code authors a
+   (`clauseIdSchema` remains the contract everywhere _our_ code authors a
    serialized id: API responses, agent `[[clause_id]]` markers, eval gold.)
 
 2. **Citation resolution is anchor-first.** The clause whose frozen text contains

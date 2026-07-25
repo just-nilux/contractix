@@ -84,7 +84,13 @@ function reconstruct(type: DocumentType, fields: GoldField[]): ExtractedFields {
   for (const g of fields) {
     ex[g.field] = g.not_found
       ? notFound()
-      : { value: g.value, confidence: "high", citations: [], verbatim_anchor: "", status: "extracted" };
+      : {
+          value: g.value,
+          confidence: "high",
+          citations: [],
+          verbatim_anchor: "",
+          status: "extracted",
+        };
   }
   return ex;
 }
@@ -126,7 +132,9 @@ function main(): void {
       if (isExpected && !isFired) misses.push(`${doc.doc}#${id}`);
       if (!isExpected && isFired) falsePositives.push(`${doc.doc}#${id}`);
       if (isExpected && isFired && expectedSev.get(id) !== firedSev.get(id)) {
-        violations.push(`${doc.doc}#${id}: severity gold ${expectedSev.get(id)} != engine ${firedSev.get(id)}`);
+        violations.push(
+          `${doc.doc}#${id}: severity gold ${expectedSev.get(id)} != engine ${firedSev.get(id)}`,
+        );
       }
     }
     for (const id of doc.notExpected) {
@@ -179,7 +187,9 @@ function printSummary(
     `  amber F1:       ${pct(m.bySeverity.amber.f1)}`,
     `  info  F1:       ${pct(m.bySeverity.info.f1)}`,
     misses.length ? `misses (fn):      ${misses.join(", ")}` : "misses (fn):      none",
-    falsePositives.length ? `false pos (fp):   ${falsePositives.join(", ")}` : "false pos (fp):   none",
+    falsePositives.length
+      ? `false pos (fp):   ${falsePositives.join(", ")}`
+      : "false pos (fp):   none",
   ];
   if (violations.length) lines.push(`violations:       ${violations.join("; ")}`);
   console.log(`\n${lines.join("\n")}\n`);
