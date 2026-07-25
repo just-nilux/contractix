@@ -1,0 +1,163 @@
+{
+  "date": "2026-07-25",
+  "git_sha": "cb1a565",
+  "embeddings": "jina:jina-embeddings-v4@1024",
+  "reranker": "jina:jina-reranker-v3",
+  "k": 8,
+  "n": 30,
+  "recall_at_8": 1,
+  "mrr_at_8": 1,
+  "all_gold_coverage_at_8": 1,
+  "per_question": [
+    {
+      "id": "q001",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q002",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q003",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q004",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q005",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q006",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q007",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q008",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q009",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q010",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q011",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q012",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q013",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q014",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q015",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q016",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q017",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q018",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q019",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q020",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q021",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q022",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q023",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q024",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q025",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q026",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q027",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q028",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q029",
+      "hit": true,
+      "firstGoldRank": 1
+    },
+    {
+      "id": "q030",
+      "hit": true,
+      "firstGoldRank": 1
+    }
+  ]
+}
