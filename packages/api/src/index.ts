@@ -53,3 +53,23 @@ export {
   type BenchmarkParams,
   type PersistedFlag,
 } from "./extraction/benchmark-service.js";
+export {
+  classifyDocument,
+  type ClassificationResult,
+  type ClassifierDeps,
+  type ClassifierParams,
+} from "./extraction/classifier-service.js";
+export {
+  runAnalysis,
+  type AnalysisDeps,
+  type AnalysisParams,
+  type AnalysisResult,
+} from "./extraction/analysis-service.js";
+export {
+  composeDocumentReport,
+  getCaseReport,
+  getDocumentReport,
+  type CaseReport,
+  type DocumentReport,
+  type ReportDeps,
+} from "./extraction/report-service.js";

@@ -16,6 +16,7 @@ const documentSummarySchema = z.object({
   id: z.uuid(),
   filename: z.string(),
   status: z.enum(["uploaded", "processing", "ready", "failed"]),
+  analysisStatus: z.enum(["pending", "analyzing", "analyzed", "failed"]),
   language: z.enum(["de", "en", "mixed"]).nullable(),
   pageCount: z.number().int().nullable(),
 });
@@ -95,6 +96,7 @@ export function caseRoutes(deps: AppDeps) {
         id: documents.id,
         filename: documents.filename,
         status: documents.status,
+        analysisStatus: documents.analysisStatus,
         language: documents.language,
         pageCount: documents.pageCount,
       })
