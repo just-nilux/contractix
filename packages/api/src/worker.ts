@@ -1,19 +1,32 @@
 import { Worker } from "bullmq";
+import { and, eq } from "drizzle-orm";
 
 import { loadModelsConfig } from "@contractix/shared";
 
 import { env } from "./config/env.js";
-import { db } from "./db/client.js";
 import { assertEmbeddingDims } from "./db/assert.js";
+import { db } from "./db/client.js";
+import { documents } from "./db/schema/index.js";
+import { runAnalysis } from "./extraction/analysis-service.js";
 import { runIngestion } from "./ingestion/pipeline.js";
 import { logger } from "./logger.js";
 import { createProviders } from "./providers/index.js";
+import {
+  ANALYSIS_QUEUE,
+  type AnalysisJobData,
+  createAnalysisQueue,
+  enqueueAnalysis,
+} from "./queue/analysis.js";
 import { assertNoEviction, createRedis } from "./queue/connection.js";
 import { INGEST_QUEUE, type IngestJobData } from "./queue/ingest.js";
 import { LocalBlobStore } from "./storage/local.js";
 
-const connection = createRedis(env.REDIS_URL);
-await assertNoEviction(connection);
+// Blocking Workers each need their own connection; the analysis producer (used
+// by the ingest worker to chain) needs one that no Worker is blocking on.
+const ingestConnection = createRedis(env.REDIS_URL);
+const analysisConnection = createRedis(env.REDIS_URL);
+const producerConnection = createRedis(env.REDIS_URL);
+await assertNoEviction(ingestConnection);
 await assertEmbeddingDims(db);
 
 const providers = createProviders(loadModelsConfig(), {
@@ -25,11 +38,13 @@ const providers = createProviders(loadModelsConfig(), {
 const blobStore = new LocalBlobStore(env.STORAGE_DIR);
 await blobStore.init();
 
-const worker = new Worker<IngestJobData>(
+const analysisQueue = createAnalysisQueue(producerConnection);
+
+const ingestWorker = new Worker<IngestJobData>(
   INGEST_QUEUE,
   async (job) => {
     logger.info({ jobId: job.id, documentId: job.data.documentId }, "ingestion started");
-    await runIngestion(
+    const { status, tenantId } = await runIngestion(
       {
         db,
         blobStore,
@@ -41,19 +56,64 @@ const worker = new Worker<IngestJobData>(
       },
       job.data.documentId,
     );
-    logger.info({ jobId: job.id, documentId: job.data.documentId }, "ingestion finished");
+    logger.info({ jobId: job.id, documentId: job.data.documentId, status }, "ingestion finished");
+
+    // FR-5.3: a successfully indexed document chains into analysis. A failed
+    // parse never analyzes. Kept out of runIngestion so the pure pipeline stays
+    // queue-agnostic and the enqueue happens only after its transaction commits.
+    if (status === "ready") {
+      await enqueueAnalysis(analysisQueue, { documentId: job.data.documentId, tenantId });
+      logger.info({ jobId: job.id, documentId: job.data.documentId }, "analysis enqueued");
+    }
   },
-  { connection, concurrency: 2 },
+  { connection: ingestConnection, concurrency: 2 },
 );
 
-worker.on("failed", (job, err) => {
+const analysisWorker = new Worker<AnalysisJobData>(
+  ANALYSIS_QUEUE,
+  async (job) => {
+    logger.info({ jobId: job.id, documentId: job.data.documentId }, "analysis started");
+    await runAnalysis(
+      { db, llm: providers.llm },
+      { documentId: job.data.documentId, tenantId: job.data.tenantId },
+    );
+    logger.info({ jobId: job.id, documentId: job.data.documentId }, "analysis finished");
+  },
+  { connection: analysisConnection, concurrency: 2 },
+);
+
+ingestWorker.on("failed", (job, err) => {
   logger.error(
     { jobId: job?.id, documentId: job?.data.documentId, err: err.message },
     "ingestion job failed",
   );
 });
 
+analysisWorker.on("failed", (job, err) => {
+  logger.error(
+    { jobId: job?.id, documentId: job?.data.documentId, err: err.message },
+    "analysis job failed",
+  );
+  // Surface the terminal state only once BullMQ retries are exhausted; earlier
+  // attempts stay `analyzing` because a retry is still coming.
+  if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+    db.update(documents)
+      .set({ analysisStatus: "failed" })
+      .where(and(eq(documents.id, job.data.documentId), eq(documents.tenantId, job.data.tenantId)))
+      .catch((e: unknown) =>
+        logger.error(
+          { documentId: job.data.documentId, err: e instanceof Error ? e.message : String(e) },
+          "failed to mark analysis failed",
+        ),
+      );
+  }
+});
+
 logger.info(
-  { queue: INGEST_QUEUE, embeddings: providers.embeddings.id },
-  "ingestion worker started",
+  {
+    queues: [INGEST_QUEUE, ANALYSIS_QUEUE],
+    embeddings: providers.embeddings.id,
+    llm: providers.llm.id,
+  },
+  "workers started",
 );

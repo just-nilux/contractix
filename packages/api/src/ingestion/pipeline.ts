@@ -33,7 +33,10 @@ const CHUNK_INSERT_BATCH = 500;
  * re-runs would fail identically, so retrying is waste. INFRA failures
  * (db/blob/provider down) throw, letting BullMQ retry with backoff.
  */
-export async function runIngestion(deps: PipelineDeps, documentId: string): Promise<void> {
+export async function runIngestion(
+  deps: PipelineDeps,
+  documentId: string,
+): Promise<{ status: "ready" | "failed"; tenantId: string }> {
   const found = await deps.db.select().from(documents).where(eq(documents.id, documentId)).limit(1);
   const doc = found[0];
   if (!doc) throw new Error(`document ${documentId} not found`);
@@ -57,7 +60,7 @@ export async function runIngestion(deps: PipelineDeps, documentId: string): Prom
       pages: [],
       error: `no parser for mime type ${doc.mimeType}`,
     });
-    return;
+    return { status: "failed", tenantId: doc.tenantId };
   }
 
   const bytes = await deps.blobStore.get(doc.sha256, extensionForMime(doc.mimeType));
@@ -71,7 +74,7 @@ export async function runIngestion(deps: PipelineDeps, documentId: string): Prom
       pages: [],
       error: `unparseable document: ${err instanceof Error ? err.message : String(err)}`,
     });
-    return;
+    return { status: "failed", tenantId: doc.tenantId };
   }
 
   if (parsed.report.coverage < MIN_COVERAGE) {
@@ -81,7 +84,7 @@ export async function runIngestion(deps: PipelineDeps, documentId: string): Prom
         `text-layer coverage ${(parsed.report.coverage * 100).toFixed(0)}% < ` +
         `${MIN_COVERAGE * 100}% - likely scanned; requires OCR path (Phase 4)`,
     });
-    return;
+    return { status: "failed", tenantId: doc.tenantId };
   }
 
   // Geometry sidecar for the Phase-3 highlighter; not needed in the DB.
@@ -94,7 +97,7 @@ export async function runIngestion(deps: PipelineDeps, documentId: string): Prom
   const segmented = segmentClauses(parsed.blocks, canonical);
   if (segmented.length === 0) {
     await fail({ ...parsed.report, error: "no clauses could be segmented" });
-    return;
+    return { status: "failed", tenantId: doc.tenantId };
   }
 
   // ---- chunk -----------------------------------------------------------
@@ -183,4 +186,6 @@ export async function runIngestion(deps: PipelineDeps, documentId: string): Prom
       })
       .where(eq(documents.id, documentId));
   });
+
+  return { status: "ready", tenantId: doc.tenantId };
 }
