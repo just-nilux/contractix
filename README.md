@@ -11,9 +11,17 @@
 - **Ingestion & retrieval** — layout-aware PDF/DOCX parse → clause segmentation → chunking → pgvector + full-text + trigram hybrid search with cross-encoder rerank.
 - **Extraction** — schema-first, per-field-cited extraction (employment offers/contracts, VSOP/ESOP, term sheets); every field carries a structural citation to the exact clause span, and `not_found` is a first-class value, never inferred.
 - **Red-flag engine** — 31 deterministic, versioned rules over the extracted schema (e.g. sub-50% Karenzentschädigung, >1× / participating liquidation preference, bad-leaver forfeiture), each citing the clause(s) that triggered it.
-- **Evals** — retrieval (recall@8 / MRR) and extraction (field accuracy, `not_found` precision, citation recall) harnesses, gated in CI.
+- **Evals** — golden-corpus gates in CI, with pinned real numbers on the demo corpus:
 
-> Runs fully offline in **keyless mode** (deterministic fake providers) — `pnpm test` and CI need no API keys. Real extraction/retrieval and the eval baselines require provider keys; see [`.env.example`](.env.example).
+  | gate | key metrics |
+  | --- | --- |
+  | **Extraction** (Haiku 4.5) | field accuracy **0.95** · `not_found` precision **1.00** · hallucination **0.00** · citation recall 0.43 |
+  | **Rules / red-flag** (deterministic, keyless) | precision **1.00** · recall **1.00** · F1 **1.00** (24 flags / 5 docs, per severity) |
+  | **Retrieval** (Jina v4) | recall@8 **0.97** · MRR@8 **0.86** |
+
+  The rules gate is keyless and runs on **every PR**; the extraction gate runs live behind `ANTHROPIC_API_KEY`; the retrieval baseline is pending `JINA_API_KEY`. (The first live extraction run also earned its keep — it caught a citation-validation defect that keyless fakes had masked; see [ADR-0007](docs/adr/0007-anchor-first-citation-resolution.md).)
+
+> Runs fully offline in **keyless mode** (deterministic fake providers) — `pnpm test`, the rules/red-flag eval, and their CI gates need no API keys. Real extraction/retrieval and their eval baselines require provider keys; see [`.env.example`](.env.example).
 
 ## Documentation
 
