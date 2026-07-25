@@ -252,13 +252,3 @@ Empty/error states specified: parse failure per page, low-confidence extraction 
 | Prompt injection via uploaded docs | FR-7.5 posture + CI injection suite as regression gate |
 | Model/OCR landscape shifts mid-build | Everything behind provider interfaces; `models.yaml` single point of change; eval harness makes swaps safe |
 | Scope creep (the real risk) | Phases have exit criteria; anything not in FR list goes to v1.1 |
-
----
-
-## 12. Open questions (resolve in Phase 0)
-
-1. Exact model IDs for agent/extract/embed/rerank/judge — fresh benchmark check at build start, then pin.
-2. OCR: hosted API vs. Python sidecar self-host for v1 (decide on cost + DE-language table accuracy on 3 sample scans).
-3. Name/domain and whether the repo is fully public or public-write-up + private core.
-4. Anonymization default for authenticated (non-demo) users: opt-in vs opt-out.
-5. Whether to seed 5 real beta users (Berlin founder network) in week 5 to get usage numbers for the CV.
