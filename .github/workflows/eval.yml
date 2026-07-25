@@ -133,3 +133,26 @@ jobs:
         with:
           name: extraction-eval-results
           path: packages/eval/results/extraction-latest.json
+
+  # The rules / red-flag eval is a pure function of the extraction (no LLM, no
+  # Postgres), so it needs no secret and no service container — it runs on every
+  # PR, always, and never fail-softs. It gates corpus-level red-flag precision /
+  # recall / F1 against the committed baseline (bump rules.yaml `version` -> the
+  # gate demands a deliberate re-baseline).
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Rules / red-flag eval with baseline gate
+        run: pnpm eval:rules -- --gate
+      - name: Upload results
+        uses: actions/upload-artifact@v7
+        with:
+          name: rules-eval-results
+          path: packages/eval/results/rules-latest.json

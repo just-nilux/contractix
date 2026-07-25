@@ -153,6 +153,9 @@ importers:
       '@contractix/api':
         specifier: workspace:*
         version: link:../api
+      '@contractix/rules':
+        specifier: workspace:*
+        version: link:../rules
       '@contractix/shared':
         specifier: workspace:*
         version: link:../shared

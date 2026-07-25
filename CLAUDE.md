@@ -15,6 +15,7 @@ pnpm seed:demo             # ingest the demo corpus into postgres
 pnpm demo:extract          # extract + benchmark demo docs → data/demo-red-flags.json (keyless ⇒ no flags; ANTHROPIC_API_KEY for real)
 pnpm eval:retrieval        # recall@8 / MRR over gold Q&A
 pnpm eval:extraction       # extraction field accuracy / not_found precision / citation recall (real: ANTHROPIC_API_KEY + EVAL_ALLOW_LIVE_PROVIDERS)
+pnpm eval:rules            # red-flag precision/recall/F1 vs gold flags (deterministic, keyless; --gate / --write-baseline)
 ```
 
 ## Conventions
