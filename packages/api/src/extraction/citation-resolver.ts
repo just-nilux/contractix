@@ -23,6 +23,88 @@ export interface ResolvedField {
 }
 
 /**
+ * Typographic folding for anchor matching (ADR-0009): unify the quote and dash
+ * variants a model normalizes away. One code unit -> one code unit, so offsets
+ * stay exact.
+ */
+const CHAR_FOLD: Record<string, string> = {
+  "“": '"',
+  "”": '"',
+  "„": '"',
+  "‟": '"',
+  "«": '"',
+  "»": '"',
+  "″": '"',
+  "‘": "'",
+  "’": "'",
+  "‚": "'",
+  "‛": "'",
+  "′": "'",
+  "`": "'",
+  "–": "-",
+  "—": "-",
+  "―": "-",
+  "‑": "-",
+  "−": "-",
+};
+
+const WHITESPACE = /\s/;
+
+interface Normalized {
+  norm: string;
+  /** For each normalized char, the original [start,end) UTF-16 span it came from. */
+  origStart: number[];
+  origEnd: number[];
+}
+
+/**
+ * A whitespace- and typography-invariant projection of `text` that still maps
+ * every normalized char back to its exact original UTF-16 offsets. Any run of
+ * Unicode whitespace (newlines, NBSP, repeated spaces — all artifacts of PDF/DOCX
+ * layout frozen at parse time) collapses to one space; quote/dash variants fold.
+ * A match found in `norm` therefore yields the exact original span, so ADR-0005
+ * slice-identity holds even though the model's echoed anchor used plain spacing.
+ */
+function normalizeForMatch(text: string): Normalized {
+  const norm: string[] = [];
+  const origStart: number[] = [];
+  const origEnd: number[] = [];
+  let spaceRunStart = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (WHITESPACE.test(ch)) {
+      if (spaceRunStart === -1) spaceRunStart = i;
+      continue;
+    }
+    if (spaceRunStart !== -1) {
+      norm.push(" ");
+      origStart.push(spaceRunStart);
+      origEnd.push(i);
+      spaceRunStart = -1;
+    }
+    norm.push(CHAR_FOLD[ch] ?? ch);
+    origStart.push(i);
+    origEnd.push(i + 1);
+  }
+  if (spaceRunStart !== -1) {
+    norm.push(" ");
+    origStart.push(spaceRunStart);
+    origEnd.push(text.length);
+  }
+  return { norm: norm.join(""), origStart, origEnd };
+}
+
+const normCache = new WeakMap<ClauseForCitation, Normalized>();
+function normalizedClause(clause: ClauseForCitation): Normalized {
+  let n = normCache.get(clause);
+  if (!n) {
+    n = normalizeForMatch(clause.text);
+    normCache.set(clause, n);
+  }
+  return n;
+}
+
+/**
  * Resolve a field's citations to concrete clause spans (ADR-0005), structurally
  * and ANCHOR-FIRST (ADR-0007): the clause whose frozen text contains the exact
  * `verbatim_anchor` IS the citation. The model's clause ids are treated as
@@ -31,9 +113,17 @@ export interface ResolvedField {
  * binding resolution to it (the original design) silently dropped good citations
  * and, upstream, a strict id schema failed the whole extraction.
  *
- * - anchor present: pick the clause containing it, preferring a hinted clause;
- *   with no usable hint, resolve only when the anchor is unambiguous (a single
- *   containing clause) — never guess among several (ADR-0005: no fuzzy matching).
+ * Matching is whitespace- and typography-invariant (ADR-0009): the frozen text
+ * keeps original PDF/DOCX spacing (line breaks, NBSP, doubled spaces) and quotes/
+ * dashes, but a model echoes anchors with plain single spaces and straight
+ * punctuation, so long spans failed an exact `includes`. Matching runs over a
+ * normalized projection that maps back to the exact original offsets — invariance
+ * to formatting, not fuzzy matching: it is still an exact substring match, and an
+ * ambiguous anchor with no hint is still left unresolved.
+ *
+ * - anchor present: pick the clause whose normalized text contains it, preferring
+ *   a hinted clause; with no usable hint, resolve only when it is unambiguous (a
+ *   single containing clause) — never guess among several (ADR-0005).
  * - anchor empty: cite the whole span of each hinted clause.
  * - nothing grounded: the model's citations are returned as `unresolved` (for the
  *   Phase-3 "could not verify" path); an extracted value keeps its value and the
@@ -63,7 +153,9 @@ export function resolveFieldCitations(
     if (clause) hints.push(clause);
   }
 
-  if (anchor.length === 0) {
+  const normAnchor = anchor.length === 0 ? "" : normalizeForMatch(anchor).norm;
+
+  if (normAnchor.length === 0) {
     // No anchor to locate — cite the whole span of each hinted clause.
     for (const clause of hints) {
       citations.push({
@@ -74,18 +166,23 @@ export function resolveFieldCitations(
       });
     }
   } else {
-    const containing = [...clausesByRef.values()].filter((c) => c.text.includes(anchor));
+    const containing = [...clausesByRef.values()]
+      .map((clause) => ({ clause, at: normalizedClause(clause).norm.indexOf(normAnchor) }))
+      .filter((c) => c.at !== -1);
     const hintIds = new Set(hints.map((c) => c.id));
     const chosen =
-      containing.find((c) => hintIds.has(c.id)) ??
+      containing.find((c) => hintIds.has(c.clause.id)) ??
       (containing.length === 1 ? containing[0] : undefined);
     if (chosen) {
-      const idx = chosen.text.indexOf(anchor);
+      const n = normalizedClause(chosen.clause);
+      const start = n.origStart[chosen.at]!;
+      const end = n.origEnd[chosen.at + normAnchor.length - 1]!;
       citations.push({
-        clauseId: chosen.id,
-        charStart: chosen.charStart + idx,
-        charEnd: chosen.charStart + idx + anchor.length,
-        verbatimAnchor: anchor,
+        clauseId: chosen.clause.id,
+        charStart: chosen.clause.charStart + start,
+        charEnd: chosen.clause.charStart + end,
+        // The ORIGINAL frozen slice (ADR-0005), not the model's re-spaced anchor.
+        verbatimAnchor: chosen.clause.text.slice(start, end),
       });
     }
   }

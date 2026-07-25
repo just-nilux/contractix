@@ -42,7 +42,7 @@ A sample of the 31 deterministic rules. Each fires only on the _extracted_ terms
 
   | gate                                          | key metrics                                                                                              |
   | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-  | **Extraction** (Haiku 4.5)                    | field accuracy **0.95** · `not_found` precision **1.00** · hallucination **0.00** · citation recall 0.43 |
+  | **Extraction** (Haiku 4.5)                    | field accuracy **0.95** · `not_found` precision **1.00** · hallucination **0.00** · citation recall 0.91 |
   | **Rules / red-flag** (deterministic, keyless) | precision **1.00** · recall **1.00** · F1 **1.00** (24 flags / 5 docs, per severity)                     |
   | **Retrieval** (Jina v4)                       | recall@8 **0.97** · MRR@8 **0.86**                                                                       |
 

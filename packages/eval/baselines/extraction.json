@@ -1,11 +1,11 @@
 {
   "date": "2026-07-25",
-  "git_sha": "d37cf15",
+  "git_sha": "cb1a565",
   "llm": "anthropic:claude-haiku-4-5-20251001",
   "n": 48,
   "extraction_accuracy": 0.9545454545454546,
   "overall_accuracy": 0.9583333333333334,
   "not_found_precision": 1,
   "hallucination_rate": 0,
-  "citation_recall": 0.4318181818181818
+  "citation_recall": 0.9090909090909091
 }
