@@ -122,3 +122,75 @@ describe("resolveFieldCitations", () => {
     expect(hinted.citations[0]!.clauseId).toBe("b");
   });
 });
+
+describe("resolveFieldCitations — whitespace/typography invariance (ADR-0009)", () => {
+  const START = 200;
+  function clauseWith(text: string): Map<string, ClauseForCitation> {
+    const clause: ClauseForCitation = {
+      id: "c1",
+      clauseRef: "1:§1",
+      charStart: START,
+      charEnd: START + text.length,
+      text,
+    };
+    return new Map([[clause.clauseRef, clause]]);
+  }
+
+  it("matches across a line break the model echoed as a space, keeping exact offsets", () => {
+    const text = "Homeoffice ist an bis zu drei Tagen pro Woche\nnach Abstimmung erlaubt.";
+    const byRef = clauseWith(text);
+    const { citations, unresolved } = resolveFieldCitations(
+      { citations: [], verbatim_anchor: "drei Tagen pro Woche nach Abstimmung" },
+      byRef,
+      DOC_ID,
+    );
+    expect(unresolved).toEqual([]);
+    expect(citations).toHaveLength(1);
+    const c = citations[0]!;
+    // The stored span is the ORIGINAL frozen text — it keeps the newline (ADR-0005),
+    // not the model's re-spaced anchor.
+    const slice = text.slice(c.charStart - START, c.charEnd - START);
+    expect(slice).toBe("drei Tagen pro Woche\nnach Abstimmung");
+    expect(c.verbatimAnchor).toBe(slice);
+  });
+
+  it("folds NBSP, doubled spaces, German quotes and en-dashes", () => {
+    // clause: NBSP, „…" German quotes, en-dash, and a double space
+    const byRef = clauseWith("Ein „Exit–Ereignis“ ist  die Veräußerung.");
+    const { citations, unresolved } = resolveFieldCitations(
+      { citations: [], verbatim_anchor: 'Ein "Exit-Ereignis" ist die Veräußerung.' },
+      byRef,
+      DOC_ID,
+    );
+    expect(unresolved).toEqual([]);
+    expect(citations).toHaveLength(1);
+  });
+
+  it("still refuses to guess an ambiguous anchor after normalization", () => {
+    const cA: ClauseForCitation = {
+      id: "a",
+      clauseRef: "1:§1",
+      charStart: 0,
+      charEnd: 31,
+      text: "Vesting über  48 Monate gesamt.",
+    };
+    const cB: ClauseForCitation = {
+      id: "b",
+      clauseRef: "1:§2",
+      charStart: 100,
+      charEnd: 125,
+      text: "Cliff:\n48 Monate minimum.",
+    };
+    const byRef = new Map([
+      [cA.clauseRef, cA],
+      [cB.clauseRef, cB],
+    ]);
+    // Both clauses contain "48 Monate" once normalized; with no hint -> unresolved.
+    const { citations } = resolveFieldCitations(
+      { citations: [], verbatim_anchor: "48 Monate" },
+      byRef,
+      DOC_ID,
+    );
+    expect(citations).toEqual([]);
+  });
+});
