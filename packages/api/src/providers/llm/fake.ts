@@ -25,6 +25,9 @@ function resolveRef(ref: string, root: JsonSchema): JsonSchema | null {
 function pickEnum(values: unknown[], key: string | undefined): unknown {
   if (key === "status" && values.includes("not_found")) return "not_found";
   if (key === "confidence" && values.includes("low")) return "low";
+  // Classification has no "not found" member; "other" is its honest no-signal
+  // answer, so keyless analysis runs end to end (extract skips the null family).
+  if (key === "document_type" && values.includes("other")) return "other";
   return values[0] ?? null;
 }
 
