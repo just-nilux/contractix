@@ -3,6 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 
 import { clauses } from "./clauses.js";
 import { extractions } from "./extractions.js";
+import { qaTurns } from "./qa-turns.js";
 
 export const citationSourceEnum = pgEnum("citation_source", ["extraction", "answer"]);
 
@@ -23,6 +24,8 @@ export const citations = pgTable(
     documentId: uuid().notNull(),
     sourceType: citationSourceEnum().notNull(),
     extractionId: uuid().references(() => extractions.id, { onDelete: "cascade" }),
+    /** Set for sourceType "answer"; mutually exclusive with extractionId. */
+    answerId: uuid().references(() => qaTurns.id, { onDelete: "cascade" }),
     clauseId: uuid()
       .notNull()
       .references(() => clauses.id, { onDelete: "cascade" }),
@@ -33,6 +36,7 @@ export const citations = pgTable(
   },
   (t) => [
     index("citations_extraction_idx").on(t.extractionId),
+    index("citations_answer_idx").on(t.answerId),
     index("citations_clause_idx").on(t.clauseId),
     index("citations_tenant_idx").on(t.tenantId),
   ],
