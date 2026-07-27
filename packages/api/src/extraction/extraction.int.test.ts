@@ -23,6 +23,9 @@ class StubLlm implements LlmProvider {
   extract(_opts: LlmExtractOptions): Promise<LlmExtractResult> {
     return Promise.resolve({ json: this.json, usage: { inputTokens: 5, outputTokens: 5 } });
   }
+  converse(): never {
+    throw new Error("StubLlm does not implement converse");
+  }
 }
 
 /** A schema-valid employment extraction: every field not_found except the overrides. */

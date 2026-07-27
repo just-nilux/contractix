@@ -51,6 +51,7 @@ describe("document upload", () => {
         embeddings: new FakeEmbeddings(1024),
         reranker: new PassthroughReranker(),
         llm: new FakeLlm(),
+        agentLlm: new FakeLlm(),
       },
       maxUploadBytes: 25 * 1024 * 1024,
     };

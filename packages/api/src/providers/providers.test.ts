@@ -14,7 +14,14 @@ version: 1
 embeddings: { provider: jina, model: test-embed, dimensions: 32, api_key_env: JINA_API_KEY, base_url: "https://jina.test/v1" }
 reranker: { provider: jina, model: test-rerank, api_key_env: JINA_API_KEY, base_url: "https://jina.test/v1" }
 llm:
-  primary: { provider: anthropic, model: a, small_model: b, api_key_env: ANTHROPIC_API_KEY }
+  primary:
+    provider: anthropic
+    model: a
+    small_model: b
+    api_key_env: ANTHROPIC_API_KEY
+    params: { model: { sampling: false, effort: high }, small_model: { sampling: true } }
+    pricing_usd_per_mtok: { model: { input: 3, output: 15 }, small_model: { input: 1, output: 5 } }
+    usd_to_eur: 0.92
   fallback: { provider: openai, model: null, api_key_env: OPENAI_API_KEY }
 `;
 const cfg = parseModelsConfig(YAML);
@@ -79,6 +86,9 @@ describe("createProviders", () => {
     expect(bundle.llm).toBeInstanceOf(AnthropicLlm);
     // Extraction binds to the small model (ADR-0004), not the primary.
     expect(bundle.llm.id).toBe("anthropic:b");
+    // The agent loop binds to the frontier model — two adapters, one key.
+    expect(bundle.agentLlm).toBeInstanceOf(AnthropicLlm);
+    expect(bundle.agentLlm.id).toBe("anthropic:a");
   });
 
   it("degrades to fakes without keys outside production, with a fallback hook", () => {
@@ -87,6 +97,7 @@ describe("createProviders", () => {
     expect(bundle.embeddings).toBeInstanceOf(FakeEmbeddings);
     expect(bundle.reranker).toBeInstanceOf(PassthroughReranker);
     expect(bundle.llm).toBeInstanceOf(FakeLlm);
+    expect(bundle.agentLlm).toBeInstanceOf(FakeLlm);
     expect(onFallback).toHaveBeenCalledWith("embeddings", "missing JINA_API_KEY");
     expect(onFallback).toHaveBeenCalledWith("reranker", "missing JINA_API_KEY");
     expect(onFallback).toHaveBeenCalledWith("llm", "missing ANTHROPIC_API_KEY");
@@ -218,7 +229,10 @@ describe("AnthropicLlm", () => {
         { status: 200 },
       );
     });
-    const llm = new AnthropicLlm({ model: "claude-haiku", apiKey: "k" }, { fetchFn });
+    const llm = new AnthropicLlm(
+      { model: "claude-haiku", apiKey: "k", params: { sampling: true } },
+      { fetchFn },
+    );
 
     const res = await llm.extract({
       system: "sys",
@@ -246,10 +260,145 @@ describe("AnthropicLlm", () => {
           { status: 200 },
         ),
     );
-    const llm = new AnthropicLlm({ model: "m", apiKey: "k" }, { fetchFn });
+    const llm = new AnthropicLlm(
+      { model: "m", apiKey: "k", params: { sampling: true } },
+      { fetchFn },
+    );
     await expect(
       llm.extract({ system: "s", user: "u", toolName: "record_extraction", jsonSchema: {} }),
     ).rejects.toThrow(/tool_use/);
+  });
+
+  /**
+   * Sending a non-default temperature to Claude Sonnet 5 is a 400, so this gate
+   * is the difference between a working agent loop and one that fails on every
+   * call. Reasoning depth moves to output_config.effort instead (ADR-0010).
+   */
+  it("omits sampling params and sends effort for a model that rejects them", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const fetchFn = mockFetch((_url, body) => {
+      calls.push(body);
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "answer" }],
+          stop_reason: "end_turn",
+          usage: { input_tokens: 3, output_tokens: 4 },
+        }),
+        { status: 200 },
+      );
+    });
+    const llm = new AnthropicLlm(
+      { model: "claude-sonnet-5", apiKey: "k", params: { sampling: false, effort: "high" } },
+      { fetchFn },
+    );
+
+    const res = await llm.converse({
+      system: "grounding contract",
+      messages: [
+        { role: "user", content: [{ type: "text", text: "Wie lang ist die Probezeit?" }] },
+      ],
+      tools: [{ name: "search_clauses", description: "d", jsonSchema: { type: "object" } }],
+    });
+
+    expect(calls[0]).not.toHaveProperty("temperature");
+    expect(calls[0]).not.toHaveProperty("top_p");
+    expect(calls[0]?.output_config).toEqual({ effort: "high" });
+    // The system prompt + tool list are the cached prefix of every turn.
+    expect(calls[0]?.system).toEqual([
+      { type: "text", text: "grounding contract", cache_control: { type: "ephemeral" } },
+    ]);
+    expect(res.stopReason).toBe("end_turn");
+    expect(res.content).toEqual([{ type: "text", text: "answer" }]);
+    expect(res.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
+  });
+
+  it("round-trips tool_use and tool_result blocks through the wire shape", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const fetchFn = mockFetch((_url, body) => {
+      calls.push(body);
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "tool_use", id: "tu_1", name: "get_clause", input: { id: "c1" } }],
+          stop_reason: "tool_use",
+          usage: { input_tokens: 1, output_tokens: 2 },
+        }),
+        { status: 200 },
+      );
+    });
+    const llm = new AnthropicLlm(
+      { model: "m", apiKey: "k", params: { sampling: false } },
+      { fetchFn },
+    );
+
+    const res = await llm.converse({
+      system: "s",
+      messages: [
+        { role: "user", content: [{ type: "text", text: "q" }] },
+        { role: "assistant", content: [{ type: "tool_use", id: "tu_0", name: "s", input: {} }] },
+        {
+          role: "user",
+          content: [{ type: "tool_result", toolUseId: "tu_0", content: "[]", isError: true }],
+        },
+      ],
+      tools: [{ name: "get_clause", description: "d", jsonSchema: { type: "object" } }],
+    });
+
+    const sent = calls[0]?.messages as { content: Record<string, unknown>[] }[];
+    expect(sent[1]?.content[0]).toEqual({ type: "tool_use", id: "tu_0", name: "s", input: {} });
+    expect(sent[2]?.content[0]).toEqual({
+      type: "tool_result",
+      tool_use_id: "tu_0",
+      content: "[]",
+      is_error: true,
+    });
+    expect(res.stopReason).toBe("tool_use");
+    expect(res.content).toEqual([
+      { type: "tool_use", id: "tu_1", name: "get_clause", input: { id: "c1" } },
+    ]);
+  });
+
+  it("streams text deltas and assembles tool input from partial JSON", async () => {
+    const frames = [
+      `event: message_start\ndata: {"message":{"usage":{"input_tokens":9}}}`,
+      `event: content_block_start\ndata: {"index":0,"content_block":{"type":"text","text":""}}`,
+      `event: content_block_delta\ndata: {"index":0,"delta":{"type":"text_delta","text":"Die "}}`,
+      `event: content_block_delta\ndata: {"index":0,"delta":{"type":"text_delta","text":"Probezeit"}}`,
+      `event: content_block_start\ndata: {"index":1,"content_block":{"type":"tool_use","id":"tu_9","name":"math"}}`,
+      `event: content_block_delta\ndata: {"index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"expr\\":"}}`,
+      `event: content_block_delta\ndata: {"index":1,"delta":{"type":"input_json_delta","partial_json":"\\"1+1\\"}"}}`,
+      `event: message_delta\ndata: {"delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":21}}`,
+    ].join("\n\n");
+
+    const fetchFn = ((_url: unknown, init?: { body?: unknown }) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      expect(body.stream).toBe(true);
+      return Promise.resolve(
+        new Response(`${frames}\n\n`, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      );
+    }) as typeof fetch;
+
+    const llm = new AnthropicLlm(
+      { model: "m", apiKey: "k", params: { sampling: false } },
+      { fetchFn },
+    );
+    const deltas: string[] = [];
+    const res = await llm.converse({
+      system: "s",
+      messages: [{ role: "user", content: [{ type: "text", text: "q" }] }],
+      tools: [],
+      onTextDelta: (d) => deltas.push(d),
+    });
+
+    expect(deltas).toEqual(["Die ", "Probezeit"]);
+    expect(res.stopReason).toBe("tool_use");
+    expect(res.usage).toEqual({ inputTokens: 9, outputTokens: 21 });
+    expect(res.content).toEqual([
+      { type: "text", text: "Die Probezeit" },
+      { type: "tool_use", id: "tu_9", name: "math", input: { expr: "1+1" } },
+    ]);
   });
 });
 
@@ -302,5 +451,87 @@ describe("FakeLlm", () => {
     };
     const res = await llm.extract({ system: "s", user: "u", toolName: "t", jsonSchema });
     expect(res.json).toEqual({ field: { status: "not_found" } });
+  });
+
+  /**
+   * Keyless CI has to exercise the whole agent path, so the fake runs a real
+   * two-phase loop: retrieve, then answer citing only what came back.
+   */
+  describe("converse", () => {
+    const SEARCH = { name: "search_clauses", description: "d", jsonSchema: { type: "object" } };
+    const CLAUSE_ID = "6a2f1c3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b:2:§11";
+
+    it("retrieves first", async () => {
+      const res = await new FakeLlm().converse({
+        system: "s",
+        messages: [
+          { role: "user", content: [{ type: "text", text: "Wie lang ist die Probezeit?" }] },
+        ],
+        tools: [SEARCH],
+      });
+
+      expect(res.stopReason).toBe("tool_use");
+      expect(res.content).toEqual([
+        {
+          type: "tool_use",
+          id: "fake-tool-1",
+          name: "search_clauses",
+          input: { query: "Wie lang ist die Probezeit?" },
+        },
+      ]);
+    });
+
+    it("then answers citing only the clauses the tool returned", async () => {
+      const deltas: string[] = [];
+      const res = await new FakeLlm().converse({
+        system: "s",
+        messages: [
+          { role: "user", content: [{ type: "text", text: "q" }] },
+          {
+            role: "assistant",
+            content: [{ type: "tool_use", id: "fake-tool-1", name: "search_clauses", input: {} }],
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                toolUseId: "fake-tool-1",
+                content: JSON.stringify([{ serializedClauseId: CLAUSE_ID }]),
+              },
+            ],
+          },
+        ],
+        tools: [SEARCH],
+        onTextDelta: (d) => deltas.push(d),
+      });
+
+      expect(res.stopReason).toBe("end_turn");
+      const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+      expect(text).toContain(`[[${CLAUSE_ID}]]`);
+      expect(deltas.join("")).toBe(text);
+    });
+
+    it("stays honest when retrieval found nothing — no citation is invented", async () => {
+      const res = await new FakeLlm().converse({
+        system: "s",
+        messages: [
+          { role: "user", content: [{ type: "text", text: "q" }] },
+          {
+            role: "assistant",
+            content: [{ type: "tool_use", id: "fake-tool-1", name: "search_clauses", input: {} }],
+          },
+          {
+            role: "user",
+            content: [{ type: "tool_result", toolUseId: "fake-tool-1", content: "[]" }],
+          },
+        ],
+        tools: [SEARCH],
+      });
+
+      const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+      expect(res.stopReason).toBe("end_turn");
+      expect(text).not.toContain("[[");
+    });
   });
 });

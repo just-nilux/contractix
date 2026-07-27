@@ -67,7 +67,12 @@ describe("search and clause routes", () => {
       blobStore,
       ingestQueue: createIngestQueue(redis),
       analysisQueue: createAnalysisQueue(redis),
-      providers: { embeddings, reranker: new PassthroughReranker(), llm: new FakeLlm() },
+      providers: {
+        embeddings,
+        reranker: new PassthroughReranker(),
+        llm: new FakeLlm(),
+        agentLlm: new FakeLlm(),
+      },
       maxUploadBytes: 25 * 1024 * 1024,
     };
     app = createApp(deps);

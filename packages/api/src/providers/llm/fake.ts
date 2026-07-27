@@ -1,5 +1,8 @@
 import {
   type JsonSchema,
+  type LlmContentBlock,
+  type LlmConverseOptions,
+  type LlmConverseResult,
   type LlmExtractOptions,
   type LlmExtractResult,
   type LlmProvider,
@@ -90,11 +93,85 @@ function fakeValueForSchema(schema: JsonSchema, root: JsonSchema, key?: string):
  * and persistence end to end. Real extraction values require Anthropic, so the
  * extraction eval baseline is live-gated exactly like the embeddings baseline.
  */
+/** Serialized clause ids ({uuid}:{page}:{path}) embedded in a tool result payload. */
+const CLAUSE_ID_RE =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d+:[^"\s,\]}]+/giu;
+
+const SEARCH_TOOL = "search_clauses";
+/** Two tool turns is plenty to exercise the loop; past that the fake answers. */
+const MAX_FAKE_TOOL_TURNS = 2;
+
+function textOf(blocks: LlmContentBlock[]): string {
+  return blocks
+    .filter((b): b is Extract<LlmContentBlock, { type: "text" }> => b.type === "text")
+    .map((b) => b.text)
+    .join(" ");
+}
+
 export class FakeLlm implements LlmProvider {
   readonly id = "fake:llm";
 
   extract(opts: LlmExtractOptions): Promise<LlmExtractResult> {
     const json = fakeValueForSchema(opts.jsonSchema, opts.jsonSchema);
     return Promise.resolve({ json, usage: { inputTokens: 0, outputTokens: 0 } });
+  }
+
+  /**
+   * Scripted two-phase loop: retrieve once, then answer citing exactly what came
+   * back. The schema-walking trick `extract` uses cannot express a tool loop, so
+   * this is hand-written instead — its job is to keep the agent loop, grounding
+   * validator, citation persistence and SSE path exercised in keyless CI, not to
+   * produce a real answer. It never claims knowledge it does not have: with no
+   * retrieved clause it emits an uncited sentence, which the validator correctly
+   * routes to "could not verify".
+   */
+  converse(opts: LlmConverseOptions): Promise<LlmConverseResult> {
+    const usage = { inputTokens: 0, outputTokens: 0 };
+    const toolTurns = opts.messages.filter(
+      (m) => m.role === "assistant" && m.content.some((b) => b.type === "tool_use"),
+    ).length;
+
+    const results = opts.messages.flatMap((m) =>
+      m.content.filter(
+        (b): b is Extract<LlmContentBlock, { type: "tool_result" }> => b.type === "tool_result",
+      ),
+    );
+    const hasSearchTool = opts.tools.some((t) => t.name === SEARCH_TOOL);
+
+    if (results.length === 0 && hasSearchTool && toolTurns < MAX_FAKE_TOOL_TURNS) {
+      const question = textOf(opts.messages.at(-1)?.content ?? []);
+      return Promise.resolve({
+        stopReason: "tool_use",
+        content: [
+          {
+            type: "tool_use",
+            id: `fake-tool-${toolTurns + 1}`,
+            name: SEARCH_TOOL,
+            input: { query: question.slice(0, 400) },
+          },
+        ],
+        usage,
+      });
+    }
+
+    const cited = [...new Set(results.flatMap((r) => r.content.match(CLAUSE_ID_RE) ?? []))].slice(
+      0,
+      2,
+    );
+    const text =
+      cited.length > 0
+        ? `Keyless mode returns no model-generated analysis; the retrieved clause is cited so the citation path stays verifiable. ${cited
+            .map((id) => `[[${id}]]`)
+            .join(" ")}`
+        : "Keyless mode returns no model-generated analysis, and retrieval matched no clause for this question.";
+
+    const stream = opts.onTextDelta;
+    if (stream) for (const word of text.split(/(?<=\s)/u)) stream(word);
+
+    return Promise.resolve({
+      stopReason: "end_turn",
+      content: [{ type: "text", text }],
+      usage,
+    });
   }
 }
