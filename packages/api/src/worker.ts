@@ -19,12 +19,20 @@ import {
 } from "./queue/analysis.js";
 import { assertNoEviction, createRedis } from "./queue/connection.js";
 import { INGEST_QUEUE, type IngestJobData } from "./queue/ingest.js";
+import {
+  createRetentionQueue,
+  RETENTION_QUEUE,
+  type RetentionJobData,
+  scheduleRetentionSweep,
+} from "./queue/retention.js";
+import { purgeExpiredTenants } from "./retention/purge.js";
 import { LocalBlobStore } from "./storage/local.js";
 
 // Blocking Workers each need their own connection; the analysis producer (used
 // by the ingest worker to chain) needs one that no Worker is blocking on.
 const ingestConnection = createRedis(env.REDIS_URL);
 const analysisConnection = createRedis(env.REDIS_URL);
+const retentionConnection = createRedis(env.REDIS_URL);
 const producerConnection = createRedis(env.REDIS_URL);
 await assertNoEviction(ingestConnection);
 await assertEmbeddingDims(db);
@@ -39,6 +47,9 @@ const blobStore = new LocalBlobStore(env.STORAGE_DIR);
 await blobStore.init();
 
 const analysisQueue = createAnalysisQueue(producerConnection);
+
+// FR-7.3: sweeps anonymous sessions 24 h after they were minted.
+await scheduleRetentionSweep(createRetentionQueue(producerConnection));
 
 const ingestWorker = new Worker<IngestJobData>(
   INGEST_QUEUE,
@@ -82,6 +93,19 @@ const analysisWorker = new Worker<AnalysisJobData>(
   { connection: analysisConnection, concurrency: 2 },
 );
 
+const retentionWorker = new Worker<RetentionJobData>(
+  RETENTION_QUEUE,
+  async () => {
+    const result = await purgeExpiredTenants({ db, blobStore });
+    logger.info(result, "retention sweep finished");
+  },
+  { connection: retentionConnection, concurrency: 1 },
+);
+
+retentionWorker.on("failed", (_job, err) => {
+  logger.error({ err: err.message }, "retention sweep failed");
+});
+
 ingestWorker.on("failed", (job, err) => {
   logger.error(
     { jobId: job?.id, documentId: job?.data.documentId, err: err.message },
@@ -111,7 +135,7 @@ analysisWorker.on("failed", (job, err) => {
 
 logger.info(
   {
-    queues: [INGEST_QUEUE, ANALYSIS_QUEUE],
+    queues: [INGEST_QUEUE, ANALYSIS_QUEUE, RETENTION_QUEUE],
     embeddings: providers.embeddings.id,
     llm: providers.llm.id,
   },
