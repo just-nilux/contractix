@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
-    "dev": "pnpm --parallel --filter @contractix/api --filter @contractix/web dev",
+    "dev": "tsx scripts/dev.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
