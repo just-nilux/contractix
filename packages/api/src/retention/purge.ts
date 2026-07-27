@@ -39,7 +39,9 @@ export async function purgeExpiredTenants(
   const expired = await deps.db
     .select({ id: tenants.id })
     .from(tenants)
-    .where(and(eq(tenants.kind, "anon"), isNotNull(tenants.expiresAt), lte(tenants.expiresAt, now)));
+    .where(
+      and(eq(tenants.kind, "anon"), isNotNull(tenants.expiresAt), lte(tenants.expiresAt, now)),
+    );
   if (expired.length === 0) return { tenants: 0, blobs: 0 };
 
   const ids = expired.map((t) => t.id);
