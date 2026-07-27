@@ -64,15 +64,28 @@ direction: ADR-0007 relaxed _model-supplied_ ids to hints because the model
 rarely echoes them correctly; ids **we** emit and check stay strict.
 
 **6. Validation failure buys exactly one corrective regeneration.** The critique
-names the offending sentences and re-states the only legal ids. If the retry
-still fails, the unsupported claims are returned in `couldNotVerify` rather than
-dropped: a claim the user can see is flagged is safer than one silently removed
-(FR-5.2). Sentence splitting masks markers first so a clause path like
-`anlage-1/2.1` cannot split a sentence, skips German legal abbreviations
-(`§ 3 Abs. 2`, `z.B.`, `Nr.`), and absorbs a marker trailing the final period —
-each of those, left unhandled, fails a _correct_ answer.
+names the offending sentences, re-states the only legal ids, and asks for the
+corrected answer and nothing else. If the retry still fails, the unsupported
+claims are returned in `couldNotVerify` rather than dropped: a claim the user can
+see is flagged is safer than one silently removed (FR-5.2).
 
-**7. Keyless mode stays first-class.** `FakeLlm.converse()` runs a scripted
+**7. Not every sentence is a claim about the documents.** A sentence may instead
+carry `[[statute:§74 Abs. 2 HGB]]`, `[[context:...]]` or `[[caveat]]`. These
+satisfy the contract without producing a citation, and are counted separately so
+the UI can render them as "not from your documents" rather than letting them pass
+as sourced. This is weaker than a clause citation by design; the alternative —
+loosening the check — would have weakened it for document claims too.
+
+Everything in points 6 and 7 is shaped by what a correct answer actually looks
+like, which only live verification revealed. Splitting masks markers first (so
+`anlage-1/2.1` cannot split a sentence), skips German legal abbreviations
+(`§ 3 Abs. 2`, `z.B.`, `Nr.`), absorbs a marker trailing the final period, splits
+on every line break, and exempts Markdown headings and short bold labels. Each of
+those, left unhandled, failed a _correct_ answer against real Sonnet 5 and burned
+the one retry doing it. The trace now records what the validator rejected, so the
+next round of tuning has evidence rather than guesswork.
+
+**8. Keyless mode stays first-class.** `FakeLlm.converse()` runs a scripted
 retrieve-then-answer loop citing only ids a tool actually returned, and emits an
 uncited sentence when retrieval finds nothing. CI therefore exercises the loop,
 the validator, citation persistence and SSE without a key, and the integration
@@ -87,11 +100,16 @@ and the validator drift, that fails rather than passing via the retry.
   FR-6.1 trace drawer and the FR-8 cost KPI read stored rows rather than logs.
   Cost derives from the published USD price and one pinned FX rate, so every
   figure traces to a source.
-- The strictness is deliberate and will produce false positives: any sentence
-  containing letters is treated as an assertion needing a citation, exempting
-  only a lead-in ending in `:`. Re-evaluate against real answers once the
-  faithfulness eval exists — the tuning signal should come from measurement, not
-  from taste.
+- The strictness is deliberate: any sentence containing letters is an assertion
+  needing a citation, exempting only lead-ins ending in `:` and headings. It will
+  still produce false positives, and the heading heuristic (length-bounded, no
+  terminal punctuation) is the shakiest part of it. Re-evaluate against the
+  faithfulness eval — the tuning signal should come from measurement, not taste.
+- A claim about what a document does **not** contain still needs a clause to
+  point at, typically the one that defers elsewhere. Whether absence deserves its
+  own marker is a product question, deliberately left open rather than decided by
+  feel; `[[caveat]]` is not the right answer for it, because absence _is_ a claim
+  about the documents.
 - **Deferred, not dropped:** the LLM-as-judge faithfulness eval (PRD E-2/E-4)
   needs a `judge` role in `models.yaml`, versioned judge prompts and a
   re-baselining discipline — Phase 4, and the 30 gold Q&A pairs currently
