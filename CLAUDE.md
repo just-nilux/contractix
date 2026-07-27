@@ -40,5 +40,9 @@ pnpm eval:rules            # red-flag precision/recall/F1 vs gold flags (determi
   real API key.
 - Eval baselines (`packages/eval/baselines/`) change only in deliberate `chore(eval)` commits
   with the PR-template section filled in.
+- Read ADR-0011 before touching auth, tenancy, or the demo path: the tenant comes **only** from
+  the signed session cookie (`tenantOf(c)`), never a path param, header, or body field; the
+  demo corpus is **cloned** into a visitor's own tenant rather than shared read-only, so the
+  guard below stays a single equality check; and rate limiting fails **open** on a Redis error.
 - `tenant_id` guard in every chunk/clause/extraction/flag/citation/qa_turn query — denormalized
-  precisely so no join is needed.
+  precisely so no join is needed. Never widen it to set membership.

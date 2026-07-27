@@ -13,7 +13,7 @@ sensitive by default.
 | All processing & storage in the EU (Hetzner, Falkenstein/Nuremberg)                    | planned — deploy lands in Phase 3/4                                          |
 | Model calls only to providers with EU data-processing terms & no-training guarantees   | in effect — provider list below                                              |
 | Anonymization pre-pass (NER redaction) before external model calls                     | Phase 4                                                                      |
-| Retention: user-settable, default 30 days; hard delete incl. embeddings & log payloads | schema carries `retention_days`; deletion job lands in Phase 4               |
+| Retention: user-settable, default 30 days; hard delete incl. embeddings & log payloads | in effect for anonymous sessions — 24 h purge job + `DELETE /cases/:id`      |
 | At-rest encryption for file storage; TLS everywhere                                    | deploy-time (Phase 3/4)                                                      |
 | Document text is data, never instructions (prompt-injection posture)                   | in effect — see the section below; injection suite (regression gate) Phase 4 |
 
@@ -56,7 +56,29 @@ clause still resolves to nothing. What is **not** yet in place is the adversaria
 gate (PRD E-2: 15 documents with embedded instructions); that is Phase 4, and until it exists
 this posture is enforced by construction but not measured.
 
+## What a session is, and how long it lasts
+
+There are no accounts. Visiting the app and creating a case (or adopting the demo corpus)
+mints an **anonymous session**: a signed, `HttpOnly` cookie whose only content is an opaque
+tenant id. No email, no password, no profile.
+
+- **Everything you upload is scoped to that session.** Every query carries a single
+  `tenant_id` equality guard, so another session cannot read your documents — the API
+  returns 404, not 403, for a case that is not yours.
+- **The session and everything under it are deleted 24 hours after it is created** — files,
+  clauses, embeddings, extractions, red flags, and Q&A turns. An hourly job performs the
+  deletion and verifies that nothing was left behind.
+- **You can delete earlier.** `DELETE /cases/:id` removes the case and everything derived
+  from it immediately, including the stored file.
+- Deleting the data is also what ends the session: the cookie stops working the moment its
+  tenant is gone, so there is no separate token to revoke.
+
 ## Demo corpus
 
 All documents in `corpus/` are synthetic, authored for this repository. No real person,
 company, or agreement is represented. The eval set never contains user data (PRD E-1).
+
+Choosing "try the demo" **copies** the corpus into your own session rather than showing you
+a shared one, so you can ask questions of it, re-run the analysis, upload your own contract
+alongside it, and delete the lot. That copy is purged on the same 24-hour clock as anything
+else you upload.
