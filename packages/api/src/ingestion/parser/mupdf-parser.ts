@@ -84,7 +84,8 @@ export class MupdfParser implements Parser {
         const pageNo = i + 1;
         try {
           const page = doc.loadPage(i);
-          const [, y0, , y1] = page.getBounds();
+          const [x0, y0, x1, y1] = page.getBounds();
+          const pageWidth = x1 - x0;
           const pageHeight = y1 - y0;
           const st = JSON.parse(page.toStructuredText("preserve-whitespace").asJSON()) as {
             blocks?: StBlock[];
@@ -100,19 +101,30 @@ export class MupdfParser implements Parser {
             chars += text.length;
             raw.push({
               page: pageNo,
+              // Relative to the page box origin, not the PDF user space origin.
+              // Identical for a CropBox at (0,0) - which is every document in
+              // the corpus - and correct for one that is not, where the viewer
+              // renders from the page box and would otherwise be offset.
               bbox: {
-                x: block.bbox.x,
-                y: block.bbox.y,
+                x: block.bbox.x - x0,
+                y: block.bbox.y - y0,
                 width: block.bbox.w,
                 height: block.bbox.h,
               },
               lines: block.lines,
               text,
               maxFontSize: Math.max(...block.lines.map((l) => l.font?.size ?? 0)),
-              bottomRatio: pageHeight > 0 ? (block.bbox.y + block.bbox.h) / pageHeight : 0,
+              // Also page-box relative, so footer detection and the bbox agree.
+              bottomRatio: pageHeight > 0 ? (block.bbox.y - y0 + block.bbox.h) / pageHeight : 0,
             });
           }
-          pages.push({ page: pageNo, status: chars > 0 ? "ok" : "empty", chars });
+          pages.push({
+            page: pageNo,
+            status: chars > 0 ? "ok" : "empty",
+            chars,
+            width: pageWidth,
+            height: pageHeight,
+          });
         } catch (err) {
           pages.push({
             page: pageNo,

@@ -8,7 +8,6 @@ import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { db, pool } from "../db/client.js";
-import { tenants } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index.js";
 import { createAnalysisQueue } from "../queue/analysis.js";
@@ -115,11 +114,13 @@ describe("rate limiting (real redis)", () => {
 
   // The limiter runs before `ensureTenant`, so a rejected request must not
   // have minted the tenant it was rejected for - otherwise the IP limit that
-  // exists to stop tenant-table flooding would itself flood it.
+  // exists to stop tenant-table flooding would itself flood it. A minted
+  // session always sets a cookie, so its absence is the local proof that
+  // `ensureTenant` never ran. (A global tenant count would be flaky: the
+  // integration suites run in parallel forks and mint concurrently.)
   it("does not mint a tenant for a rejected request", async () => {
-    const before = await db.$count(tenants);
     const res = await createCase("rejected");
     expect(res.status).toBe(429);
-    expect(await db.$count(tenants)).toBe(before);
+    expect(res.headers.get("set-cookie")).toBeNull();
   });
 });

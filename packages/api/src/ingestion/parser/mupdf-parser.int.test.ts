@@ -31,9 +31,11 @@ describe("MupdfParser", () => {
 
     expect(parsed.pageCount).toBe(2);
     expect(parsed.report.coverage).toBe(1);
+    // Page dimensions are recorded so the viewer can scale block bboxes to
+    // rendered pixels without inferring the page box.
     expect(parsed.report.pages).toEqual([
-      { page: 1, status: "ok", chars: expect.any(Number) as number },
-      { page: 2, status: "ok", chars: expect.any(Number) as number },
+      { page: 1, status: "ok", chars: expect.any(Number) as number, width: 612, height: 792 },
+      { page: 2, status: "ok", chars: expect.any(Number) as number, width: 612, height: 792 },
     ]);
 
     // Footers are excluded before offsets freeze.

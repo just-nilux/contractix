@@ -177,10 +177,17 @@ describe("anonymous sessions", () => {
     expect(res.status).toBe(200);
   });
 
+  // Only POST /cases and POST /demo/adopt may mint, so a crawler cannot fill
+  // the tenants table. A minted session always sets a cookie, so its absence is
+  // the proof - a global tenant count would race the other integration suites,
+  // which run in parallel forks and mint concurrently.
   it("does not mint a session on routes that only read", async () => {
-    const before = await db.$count(tenants);
-    expect((await app.request("/healthz")).status).toBe(200);
-    expect((await app.request("/cases/0197a3b2-1c4d-7e5f-8a9b-0c1d2e3f4a5b")).status).toBe(401);
-    expect(await db.$count(tenants)).toBe(before);
+    const health = await app.request("/healthz");
+    expect(health.status).toBe(200);
+    expect(health.headers.get("set-cookie")).toBeNull();
+
+    const unknown = await app.request("/cases/0197a3b2-1c4d-7e5f-8a9b-0c1d2e3f4a5b");
+    expect(unknown.status).toBe(401);
+    expect(unknown.headers.get("set-cookie")).toBeNull();
   });
 });

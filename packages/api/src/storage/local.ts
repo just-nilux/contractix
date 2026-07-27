@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 
 /**
  * Content-addressed blob store on local disk (PRD v1; S3-compatible later).
@@ -34,6 +36,22 @@ export class LocalBlobStore {
 
   async get(sha256: string, ext: string): Promise<Buffer> {
     return fs.readFile(this.blobPath(sha256, ext));
+  }
+
+  /** Streams a blob to an HTTP response without buffering 25 MB per request. */
+  createReadStream(sha256: string, ext: string): ReadableStream<Uint8Array> {
+    return Readable.toWeb(
+      createReadStream(this.blobPath(sha256, ext)),
+    ) as ReadableStream<Uint8Array>;
+  }
+
+  async exists(sha256: string, ext: string): Promise<boolean> {
+    try {
+      await fs.access(this.blobPath(sha256, ext));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async writeSidecar(sha256: string, name: string, data: unknown): Promise<void> {
