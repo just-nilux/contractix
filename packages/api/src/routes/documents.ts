@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 import { cases, documents } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
@@ -7,6 +7,9 @@ import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { enqueueIngest } from "../queue/ingest.js";
 import { extensionForMime } from "../storage/local.js";
+
+/** PRD FR-1.1: "1-10 documents per case". */
+const MAX_DOCUMENTS_PER_CASE = 10;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -64,6 +67,7 @@ const uploadDocument = (deps: AppDeps) =>
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Case not found" },
+    409: { description: "Case already holds the maximum of 10 documents" },
     413: { description: "File exceeds the 25 MB limit" },
     415: { description: "Unsupported media type" },
     ...RATE_LIMITED_RESPONSE,
@@ -146,6 +150,14 @@ export function documentRoutes(deps: AppDeps) {
     if (dup) {
       return c.json({ document: toDocumentJson(dup), deduplicated: true as const }, 200);
     }
+
+    // FR-1.1 caps a case at 10 documents. Checked after dedupe, so re-uploading
+    // a document already in the case never trips it.
+    const [{ value: docCount } = { value: 0 }] = await deps.db
+      .select({ value: count() })
+      .from(documents)
+      .where(and(eq(documents.caseId, caseId), eq(documents.tenantId, tenantId)));
+    if (docCount >= MAX_DOCUMENTS_PER_CASE) return c.body(null, 409);
 
     const inserted = await deps.db
       .insert(documents)

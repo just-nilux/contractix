@@ -7,6 +7,7 @@ import { cases, documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 import {
   caseReportSchema,
+  documentExtractionSchema,
   documentReportSchema,
   getCaseReport,
   getDocumentReport,
@@ -32,6 +33,27 @@ const getDocumentReportRoute = createRoute({
     200: {
       description: "Report",
       content: { "application/json": { schema: documentReportSchema } },
+    },
+    401: { description: "No session, or the session expired" },
+    404: { description: "Not found" },
+  },
+});
+
+/**
+ * FR-6.2 names this endpoint. It is the report's extraction slice - same
+ * tenant-scoped query, same per-field structural citations - for a client that
+ * wants the terms table without the red flags.
+ */
+const getDocumentExtractionRoute = createRoute({
+  method: "get",
+  path: "/documents/{id}/extraction",
+  summary: "Extracted fields for a document, each with its clause citations",
+  middleware: requireTenant,
+  request: { params: z.object({ id: z.uuid() }) },
+  responses: {
+    200: {
+      description: "Extraction",
+      content: { "application/json": { schema: documentExtractionSchema } },
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
@@ -102,6 +124,17 @@ export function reportRoutes(deps: AppDeps) {
     const report = await getDocumentReport({ db: deps.db }, { documentId: id, tenantId });
     if (!report) return c.body(null, 404);
     return c.json(report, 200);
+  });
+
+  app.openapi(getDocumentExtractionRoute, async (c) => {
+    const { id } = c.req.valid("param");
+    const tenantId = tenantOf(c);
+    const report = await getDocumentReport({ db: deps.db }, { documentId: id, tenantId });
+    if (!report) return c.body(null, 404);
+    return c.json(
+      { documentId: id, disclaimer: report.disclaimer, extraction: report.extraction },
+      200,
+    );
   });
 
   app.openapi(analyzeDocumentRoute(deps), async (c) => {

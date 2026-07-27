@@ -50,6 +50,13 @@ const flagCountsSchema = z.object({
   info: z.number().int(),
 });
 
+/** FR-6.2's `GET /documents/:id/extraction` - the report's extraction slice. */
+export const documentExtractionSchema = z.object({
+  documentId: z.uuid(),
+  disclaimer: z.string(),
+  extraction: z.object({ schemaVer: z.string(), fields: z.array(reportFieldSchema) }).nullable(),
+});
+
 export const documentReportSchema = z.object({
   document: z.object({
     id: z.uuid(),

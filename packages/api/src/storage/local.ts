@@ -54,6 +54,17 @@ export class LocalBlobStore {
     }
   }
 
+  /** FR-7.3 hard delete: the blob and any sidecars derived from it. */
+  async remove(sha256: string, ext: string): Promise<void> {
+    await fs.rm(this.blobPath(sha256, ext), { force: true });
+    const entries = await fs.readdir(this.root).catch(() => []);
+    for (const entry of entries) {
+      if (entry.startsWith(`${sha256}.`) && entry.endsWith(".json")) {
+        await fs.rm(path.join(this.root, entry), { force: true });
+      }
+    }
+  }
+
   async writeSidecar(sha256: string, name: string, data: unknown): Promise<void> {
     const dest = path.join(this.root, `${sha256}.${name}.json`);
     const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
