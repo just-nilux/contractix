@@ -3,7 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { type LlmExtractOptions, type LlmExtractResult, type LlmProvider } from "@contractix/api";
+import {
+  type LlmConverseOptions,
+  type LlmConverseResult,
+  type LlmExtractOptions,
+  type LlmExtractResult,
+  type LlmProvider,
+} from "@contractix/api";
 
 const CACHE_PATH = path.resolve(fileURLToPath(import.meta.url), "../..", "cache/llm.jsonl");
 
@@ -73,5 +79,16 @@ export class CachedLlm implements LlmProvider {
       `${JSON.stringify({ provider: this.id, sha256: sha, result } satisfies CacheLine)}\n`,
     );
     return result;
+  }
+
+  /**
+   * Passed through uncached. This cache content-addresses a single forced-tool
+   * call; an agent turn is a function of the whole message history including
+   * tool results, so caching it would key on a transcript that never repeats.
+   * The extraction eval never calls this — it exists so CachedLlm stays a
+   * drop-in LlmProvider.
+   */
+  converse(opts: LlmConverseOptions): Promise<LlmConverseResult> {
+    return this.inner.converse(opts);
   }
 }

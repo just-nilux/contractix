@@ -10,5 +10,8 @@ shaped the implementation are recorded as ADRs:
 - [ADR-0005](adr/0005-clause-identity-and-frozen-offsets.md) — clause identity & frozen offsets (citation integrity)
 - [ADR-0006](adr/0006-constrained-extraction-and-deterministic-rules.md) — constrained extraction & deterministic rules engine
 - [ADR-0007](adr/0007-anchor-first-citation-resolution.md) — anchor-first citation resolution (refines ADR-0006)
+- [ADR-0008](adr/0008-classification-and-chained-analysis.md) — document classification & chained analysis job
+- [ADR-0009](adr/0009-whitespace-invariant-anchor-resolution.md) — whitespace-invariant anchor resolution (refines ADR-0007)
+- [ADR-0010](adr/0010-agent-loop-and-grounding-contract.md) — agent loop, grounding contract & the citable set
 
 A rendered architecture diagram is a planned addition to the README.

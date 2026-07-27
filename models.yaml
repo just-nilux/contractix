@@ -24,6 +24,20 @@ llm:
     model: claude-sonnet-5 # agent loop, report generation
     small_model: claude-haiku-4-5-20251001 # classification, extraction repair
     api_key_env: ANTHROPIC_API_KEY
+    # Request-shape capabilities per model (ADR-0010). Sonnet 5 rejects a
+    # non-default temperature/top_p/top_k with a 400 and takes reasoning depth
+    # from output_config.effort; Haiku 4.5 still accepts temperature: 0, which
+    # is what pins extraction determinism.
+    params:
+      model: { sampling: false, effort: high }
+      small_model: { sampling: true }
+    # Anthropic list price, USD per million tokens (checked 2026-07-27).
+    # Sonnet 5 carries promotional pricing of 2.00/10.00 through 2026-08-31;
+    # billing against the standard rate keeps cost from being under-reported.
+    pricing_usd_per_mtok:
+      model: { input: 3.00, output: 15.00 }
+      small_model: { input: 1.00, output: 5.00 }
+    usd_to_eur: 0.92 # pinned 2026-07-27; re-pin deliberately, never per request
   fallback:
     provider: openai
     model: null # pinned in Phase 3 with the dual-provider router

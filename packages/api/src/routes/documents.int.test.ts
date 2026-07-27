@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { loadModelsConfig } from "@contractix/shared";
+
 import { createApp } from "../app.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
@@ -51,7 +53,9 @@ describe("document upload", () => {
         embeddings: new FakeEmbeddings(1024),
         reranker: new PassthroughReranker(),
         llm: new FakeLlm(),
+        agentLlm: new FakeLlm(),
       },
+      models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
     };
     app = createApp(deps);

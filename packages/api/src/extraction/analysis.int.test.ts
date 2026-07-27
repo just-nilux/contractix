@@ -26,6 +26,10 @@ class RoutingStubLlm implements LlmProvider {
     if (json === undefined) throw new Error(`no stub for tool ${opts.toolName}`);
     return Promise.resolve({ json, usage: { inputTokens: 5, outputTokens: 5 } });
   }
+  /** The analysis chain is forced-tool only; a converse() call here is a bug. */
+  converse(): never {
+    throw new Error("RoutingStubLlm does not implement converse");
+  }
 }
 
 function employmentJson(overrides: Record<string, unknown>): unknown {

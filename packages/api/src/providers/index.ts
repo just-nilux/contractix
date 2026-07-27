@@ -1,4 +1,4 @@
-import { type ModelsConfig } from "@contractix/shared";
+import { type LlmRole, llmModelId, llmParamsFor, type ModelsConfig } from "@contractix/shared";
 
 import { FakeEmbeddings } from "./embeddings/fake.js";
 import { JinaEmbeddings } from "./embeddings/jina.js";
@@ -13,7 +13,10 @@ import { type RerankerProvider } from "./reranker/types.js";
 export interface ProviderBundle {
   embeddings: EmbeddingsProvider;
   reranker: RerankerProvider;
+  /** Small model (Haiku): classification and extraction, per ADR-0004/0006. */
   llm: LlmProvider;
+  /** Frontier model (Sonnet): the Phase-3 agent loop and report generation. */
+  agentLlm: LlmProvider;
 }
 
 export interface ProviderFactoryOptions {
@@ -29,7 +32,8 @@ export function createProviders(cfg: ModelsConfig, opts: ProviderFactoryOptions)
   return {
     embeddings: createEmbeddings(cfg, opts),
     reranker: createReranker(cfg, opts),
-    llm: createLlm(cfg, opts),
+    llm: createLlm(cfg, opts, "small_model"),
+    agentLlm: createLlm(cfg, opts, "model"),
   };
 }
 
@@ -68,10 +72,13 @@ function createReranker(cfg: ModelsConfig, opts: ProviderFactoryOptions): Rerank
   return new JinaReranker({ model: r.model, apiKey, baseUrl: r.base_url });
 }
 
-function createLlm(cfg: ModelsConfig, opts: ProviderFactoryOptions): LlmProvider {
-  // Phase 2 uses the small model for classification/extraction (ADR-0004); the
-  // interface is model-agnostic, so the Phase-3 primary/fallback router slots in
-  // without reshaping it.
+/**
+ * One adapter per pinned role. Classification/extraction stay on the small
+ * model (ADR-0004/0006); the agent loop runs on the frontier model. Each
+ * carries its own `params`, because request-shape capabilities differ per model
+ * (Sonnet 5 rejects sampling parameters; Haiku 4.5 accepts them).
+ */
+function createLlm(cfg: ModelsConfig, opts: ProviderFactoryOptions, role: LlmRole): LlmProvider {
   const l = cfg.llm.primary;
   const apiKey = opts.envVars[l.api_key_env];
   if (!apiKey) {
@@ -81,16 +88,26 @@ function createLlm(cfg: ModelsConfig, opts: ProviderFactoryOptions): LlmProvider
     opts.onFallback?.("llm", `missing ${l.api_key_env}`);
     return new FakeLlm();
   }
-  return new AnthropicLlm({ model: l.small_model, apiKey });
+  return new AnthropicLlm({
+    model: llmModelId(cfg.llm, role),
+    apiKey,
+    params: llmParamsFor(cfg.llm, role),
+  });
 }
 
 export { type EmbeddingsProvider, type EmbedOptions } from "./embeddings/types.js";
 export { type RerankDoc, type RerankerProvider, type RerankResult } from "./reranker/types.js";
 export {
   type JsonSchema,
+  type LlmContentBlock,
+  type LlmConverseOptions,
+  type LlmConverseResult,
   type LlmExtractOptions,
   type LlmExtractResult,
+  type LlmMessage,
   type LlmProvider,
+  type LlmStopReason,
+  type LlmToolDef,
   type TokenUsage,
 } from "./llm/types.js";
 export { FakeEmbeddings } from "./embeddings/fake.js";

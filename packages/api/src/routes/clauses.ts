@@ -1,11 +1,8 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { and, eq, gte, lte } from "drizzle-orm";
 
-import { serializeClauseId } from "@contractix/shared";
-
-import { clauses } from "../db/schema/index.js";
 import { ensureDevTenant } from "../db/tenancy.js";
 import { type AppDeps } from "../deps.js";
+import { getClause, getClauseContext } from "../retrieval/clause-service.js";
 
 const clauseSchema = z.object({
   id: z.uuid(),
@@ -22,26 +19,7 @@ const clauseSchema = z.object({
   text: z.string(),
 });
 
-type ClauseRow = typeof clauses.$inferSelect;
-
-function toClauseJson(row: ClauseRow) {
-  return {
-    id: row.id,
-    documentId: row.documentId,
-    clauseRef: row.clauseRef,
-    serializedClauseId: serializeClauseId(row.documentId, row.clauseRef),
-    clausePath: row.clausePath,
-    heading: row.heading,
-    headingPath: row.headingPath,
-    page: row.page,
-    charStart: row.charStart,
-    charEnd: row.charEnd,
-    seq: row.seq,
-    text: row.text,
-  };
-}
-
-const getClause = createRoute({
+const getClauseRoute = createRoute({
   method: "get",
   path: "/clauses/{id}",
   summary: "Fetch one clause (get_clause tool core)",
@@ -55,7 +33,7 @@ const getClause = createRoute({
   },
 });
 
-const getClauseContext = createRoute({
+const getClauseContextRoute = createRoute({
   method: "get",
   path: "/clauses/{id}/context",
   summary: "Fetch a clause with its neighbors (get_clause_context tool core)",
@@ -83,51 +61,21 @@ const getClauseContext = createRoute({
 export function clauseRoutes(deps: AppDeps) {
   const app = new OpenAPIHono();
 
-  const loadClause = async (id: string, tenantId: string) => {
-    const rows = await deps.db
-      .select()
-      .from(clauses)
-      .where(and(eq(clauses.id, id), eq(clauses.tenantId, tenantId)))
-      .limit(1);
-    return rows[0];
-  };
-
-  app.openapi(getClause, async (c) => {
+  app.openapi(getClauseRoute, async (c) => {
     const { id } = c.req.valid("param");
     const tenantId = await ensureDevTenant(deps.db);
-    const row = await loadClause(id, tenantId);
-    if (!row) return c.body(null, 404);
-    return c.json(toClauseJson(row), 200);
+    const clause = await getClause(deps, { clauseId: id, tenantId });
+    if (!clause) return c.body(null, 404);
+    return c.json(clause, 200);
   });
 
-  app.openapi(getClauseContext, async (c) => {
+  app.openapi(getClauseContextRoute, async (c) => {
     const { id } = c.req.valid("param");
     const { radius } = c.req.valid("query");
     const tenantId = await ensureDevTenant(deps.db);
-    const row = await loadClause(id, tenantId);
-    if (!row) return c.body(null, 404);
-
-    const neighbors = await deps.db
-      .select()
-      .from(clauses)
-      .where(
-        and(
-          eq(clauses.documentId, row.documentId),
-          eq(clauses.tenantId, tenantId),
-          gte(clauses.seq, row.seq - radius),
-          lte(clauses.seq, row.seq + radius),
-        ),
-      )
-      .orderBy(clauses.seq);
-
-    return c.json(
-      {
-        clause: toClauseJson(row),
-        before: neighbors.filter((n) => n.seq < row.seq).map(toClauseJson),
-        after: neighbors.filter((n) => n.seq > row.seq).map(toClauseJson),
-      },
-      200,
-    );
+    const ctx = await getClauseContext(deps, { clauseId: id, tenantId, radius });
+    if (!ctx) return c.body(null, 404);
+    return c.json(ctx, 200);
   });
 
   return app;
