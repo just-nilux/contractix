@@ -66,6 +66,7 @@ describe("document upload", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     app = createApp(deps);
 

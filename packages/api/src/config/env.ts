@@ -34,6 +34,19 @@ const envSchema = z.object({
     .transform((v) => v?.trim())
     .transform((v) => (v?.length ? v : DEV_SESSION_SECRET)),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  /**
+   * Comma-separated allowed origins for a split-origin deploy. Empty (the
+   * default) sends no CORS headers at all - Caddy serves both from one origin.
+   */
+  CORS_ORIGINS: z
+    .string()
+    .optional()
+    .transform((v) =>
+      (v ?? "")
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ),
   JINA_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   EVAL_ALLOW_LIVE_PROVIDERS: z

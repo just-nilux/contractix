@@ -126,6 +126,7 @@ describe("analysis progress stream", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });
@@ -218,6 +219,7 @@ describe("analysis progress stream", () => {
         rateLimiter: new NoopRateLimiter(),
         rateLimits: DEFAULT_RATE_LIMITS,
         demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
       }),
       await sessionCookie(otherTenant),
     );

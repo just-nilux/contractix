@@ -72,6 +72,7 @@ describe("report + analyze routes (integration)", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     // The analysis functions are driven below the HTTP layer here, so this
     // suite needs the tenant id as well as a session for it.

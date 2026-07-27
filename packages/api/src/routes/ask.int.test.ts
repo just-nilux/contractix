@@ -90,6 +90,7 @@ describe("ask route (integration)", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     tenantId = await createTestTenant(db, "ask");
     app = signedIn(createApp(deps), await sessionCookie(tenantId));

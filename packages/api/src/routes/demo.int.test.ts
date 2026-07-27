@@ -147,6 +147,7 @@ describe("demo adoption", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEMO,
+      corsOrigins: [],
     };
     app = createApp(deps);
   });

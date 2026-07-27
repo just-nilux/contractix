@@ -63,6 +63,7 @@ describe("rate limiting (real redis)", () => {
       rateLimiter: new RedisRateLimiter(redis),
       rateLimits: TIGHT,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     app = createApp(deps);
   });

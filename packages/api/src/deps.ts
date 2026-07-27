@@ -35,6 +35,8 @@ export interface AppDeps {
   rateLimiter: RateLimiter;
   rateLimits: RateLimitConfig;
   demo: DemoConfig;
+  /** Empty means: send no CORS headers. */
+  corsOrigins: string[];
 }
 
 export interface BuiltDeps extends AppDeps {
@@ -68,6 +70,7 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
     rateLimiter: new RedisRateLimiter(redis),
     rateLimits: DEFAULT_RATE_LIMITS,
     demo: DEFAULT_DEMO_CONFIG,
+    corsOrigins: env.CORS_ORIGINS,
     auth: {
       secret: env.SESSION_SECRET,
       ttlSec: env.SESSION_TTL_HOURS * 60 * 60,

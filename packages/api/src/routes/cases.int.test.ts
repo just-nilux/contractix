@@ -83,6 +83,7 @@ describe("case list, delete and document limits", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     tenantId = await createTestTenant(db, "cases");
     app = signedIn(createApp(deps), await sessionCookie(tenantId));

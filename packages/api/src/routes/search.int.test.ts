@@ -89,6 +89,7 @@ describe("search and clause routes", () => {
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
       demo: DEFAULT_DEMO_CONFIG,
+      corsOrigins: [],
     };
     app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });
