@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
+import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
 import { cookieFrom, deleteTestTenant, sessionCookie, TEST_AUTH } from "../auth/testing.js";
 import { signSession } from "../auth/session.js";
 import { db, pool } from "../db/client.js";
@@ -67,6 +68,8 @@ describe("anonymous sessions", () => {
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
       auth: TEST_AUTH,
+      rateLimiter: new NoopRateLimiter(),
+      rateLimits: DEFAULT_RATE_LIMITS,
     };
     app = createApp(deps);
   });

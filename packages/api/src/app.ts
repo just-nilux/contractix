@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
 import { type AppEnv, sessionMiddleware } from "./auth/middleware.js";
+import { rateLimit } from "./auth/rate-limit.js";
 import { type AppDeps } from "./deps.js";
 import { askRoutes } from "./routes/ask.js";
 import { caseRoutes } from "./routes/cases.js";
@@ -16,6 +17,16 @@ export function createApp(deps: AppDeps) {
   // Reads the session on every request; each route then declares whether it
   // requires one (`requireTenant`) or starts one (`ensureTenant`).
   app.use("*", sessionMiddleware(deps));
+
+  // Writes carry their own tighter, per-route limits; this is the blanket
+  // ceiling on reads, which are cheap but not free. `/healthz` is exempt so a
+  // monitor can never be rate-limited into reporting the API as down.
+  app.use(
+    "*",
+    rateLimit(deps, "read", {
+      skip: (c) => c.req.method !== "GET" || c.req.path === "/healthz",
+    }),
+  );
 
   app.route("/", healthz);
   app.route("/", caseRoutes(deps));

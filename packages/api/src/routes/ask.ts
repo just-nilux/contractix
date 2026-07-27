@@ -8,6 +8,7 @@ import { type AgentEvent, askCase } from "../agent/agent-service.js";
 import { saveQaTurn } from "../agent/qa-store.js";
 import { cases } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
+import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { logger } from "../logger.js";
 
@@ -52,7 +53,8 @@ const askResponseSchema = z.object({
   trace: z.unknown(),
 });
 
-const askRoute = createRoute({
+const askRoute = (deps: AppDeps) =>
+  createRoute({
   method: "post",
   path: "/cases/{id}/ask",
   summary: "Ask a question about a case (agentic RAG, cited)",
@@ -65,7 +67,7 @@ const askRoute = createRoute({
     "regeneration; `done` — the full response body below; `error` `{message}`.\n\n" +
     "Every factual sentence carries a `[[clause_id]]` marker resolving to a real clause span. " +
     "Informational analysis, not legal advice.",
-  middleware: requireTenant,
+  middleware: [rateLimit(deps, "ask"), requireTenant] as const,
   request: {
     params: z.object({ id: z.uuid() }),
     body: { content: { "application/json": { schema: askRequestSchema } } },
@@ -77,13 +79,14 @@ const askRoute = createRoute({
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Case not found" },
+    ...RATE_LIMITED_RESPONSE,
   },
 });
 
 export function askRoutes(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>();
 
-  app.openapi(askRoute, async (c) => {
+  app.openapi(askRoute(deps), async (c) => {
     const { id: caseId } = c.req.valid("param");
     const { question } = c.req.valid("json");
     const tenantId = tenantOf(c);

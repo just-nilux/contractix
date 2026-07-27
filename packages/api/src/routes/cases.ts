@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
 import { type AppEnv, ensureTenant, requireTenant, tenantOf } from "../auth/middleware.js";
+import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { cases, documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 
@@ -34,7 +35,7 @@ const createCaseRoute = (deps: AppDeps) =>
     description:
       "Starts an anonymous session if the request carries none, returned as an HttpOnly " +
       "cookie. The session and everything uploaded under it are deleted after 24 h (FR-7.3).",
-    middleware: ensureTenant(deps),
+    middleware: [rateLimit(deps, "createCase"), ensureTenant(deps)] as const,
     request: {
       body: {
         content: {
@@ -49,6 +50,7 @@ const createCaseRoute = (deps: AppDeps) =>
         description: "Case created",
         content: { "application/json": { schema: caseSchema } },
       },
+      ...RATE_LIMITED_RESPONSE,
     },
   });
 

@@ -3,6 +3,12 @@ import { type Redis } from "ioredis";
 import { loadModelsConfig, type ModelsConfig } from "@contractix/shared";
 
 import { type AuthConfig } from "./auth/middleware.js";
+import {
+  DEFAULT_RATE_LIMITS,
+  type RateLimitConfig,
+  type RateLimiter,
+  RedisRateLimiter,
+} from "./auth/rate-limit.js";
 import { env } from "./config/env.js";
 import { db, type Db } from "./db/client.js";
 import { logger } from "./logger.js";
@@ -25,6 +31,8 @@ export interface AppDeps {
   models: ModelsConfig;
   maxUploadBytes: number;
   auth: AuthConfig;
+  rateLimiter: RateLimiter;
+  rateLimits: RateLimitConfig;
 }
 
 export interface BuiltDeps extends AppDeps {
@@ -55,6 +63,8 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
     providers,
     models,
     maxUploadBytes: MAX_UPLOAD_BYTES,
+    rateLimiter: new RedisRateLimiter(redis),
+    rateLimits: DEFAULT_RATE_LIMITS,
     auth: {
       secret: env.SESSION_SECRET,
       ttlSec: env.SESSION_TTL_HOURS * 60 * 60,

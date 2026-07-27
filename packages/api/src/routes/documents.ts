@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 
 import { cases, documents } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
+import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { enqueueIngest } from "../queue/ingest.js";
 import { extensionForMime } from "../storage/local.js";
@@ -23,14 +24,15 @@ const documentSchema = z.object({
   parseReport: z.unknown().nullable(),
 });
 
-const uploadDocument = createRoute({
+const uploadDocument = (deps: AppDeps) =>
+  createRoute({
   method: "post",
   path: "/cases/{caseId}/documents",
   summary: "Upload a document (PDF or DOCX) into a case",
   description:
     "Content-hash idempotent: re-uploading identical bytes into the same case returns the " +
     "existing document. Scanned images require the OCR path (Phase 4) and are rejected.",
-  middleware: requireTenant,
+  middleware: [rateLimit(deps, "upload"), requireTenant] as const,
   request: {
     params: z.object({ caseId: z.uuid() }),
     body: {
@@ -64,6 +66,7 @@ const uploadDocument = createRoute({
     404: { description: "Case not found" },
     413: { description: "File exceeds the 25 MB limit" },
     415: { description: "Unsupported media type" },
+    ...RATE_LIMITED_RESPONSE,
   },
 });
 
@@ -112,7 +115,7 @@ function toDocumentJson(row: typeof documents.$inferSelect) {
 export function documentRoutes(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>();
 
-  app.openapi(uploadDocument, async (c) => {
+  app.openapi(uploadDocument(deps), async (c) => {
     const { caseId } = c.req.valid("param");
     const tenantId = tenantOf(c);
 

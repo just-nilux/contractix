@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
+import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
 import { createTestTenant, deleteTestTenant, sessionCookie, signedIn, TEST_AUTH } from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { cases, documents } from "../db/schema/index.js";
@@ -78,6 +79,8 @@ describe("search and clause routes", () => {
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
       auth: TEST_AUTH,
+      rateLimiter: new NoopRateLimiter(),
+      rateLimits: DEFAULT_RATE_LIMITS,
     };
     app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });

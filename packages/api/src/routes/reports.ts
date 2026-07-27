@@ -1,8 +1,9 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
-import { cases, documents } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
+import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
+import { cases, documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 import {
   caseReportSchema,
@@ -37,13 +38,14 @@ const getDocumentReportRoute = createRoute({
   },
 });
 
-const analyzeDocumentRoute = createRoute({
+const analyzeDocumentRoute = (deps: AppDeps) =>
+  createRoute({
   method: "post",
   path: "/documents/{id}/analyze",
   summary: "(Re)run analysis for a document",
   description:
     "Enqueues classify → extract → benchmark. Idempotent: a re-run supersedes the prior analysis.",
-  middleware: requireTenant,
+  middleware: [rateLimit(deps, "analyze"), requireTenant] as const,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     202: {
@@ -53,6 +55,7 @@ const analyzeDocumentRoute = createRoute({
     401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
     409: { description: "Document is not ready (ingestion incomplete or failed)" },
+    ...RATE_LIMITED_RESPONSE,
   },
 });
 
@@ -72,11 +75,12 @@ const getCaseReportRoute = createRoute({
   },
 });
 
-const analyzeCaseRoute = createRoute({
+const analyzeCaseRoute = (deps: AppDeps) =>
+  createRoute({
   method: "post",
   path: "/cases/{id}/analyze",
   summary: "(Re)run analysis for every ready document in a case",
-  middleware: requireTenant,
+  middleware: [rateLimit(deps, "analyze"), requireTenant] as const,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     202: {
@@ -85,6 +89,7 @@ const analyzeCaseRoute = createRoute({
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
+    ...RATE_LIMITED_RESPONSE,
   },
 });
 
@@ -99,7 +104,7 @@ export function reportRoutes(deps: AppDeps) {
     return c.json(report, 200);
   });
 
-  app.openapi(analyzeDocumentRoute, async (c) => {
+  app.openapi(analyzeDocumentRoute(deps), async (c) => {
     const { id } = c.req.valid("param");
     const tenantId = tenantOf(c);
     const rows = await deps.db
@@ -128,7 +133,7 @@ export function reportRoutes(deps: AppDeps) {
     return c.json(report, 200);
   });
 
-  app.openapi(analyzeCaseRoute, async (c) => {
+  app.openapi(analyzeCaseRoute(deps), async (c) => {
     const { id } = c.req.valid("param");
     const tenantId = tenantOf(c);
     const kase = await deps.db
