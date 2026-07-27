@@ -71,6 +71,18 @@ describe("splitSentences", () => {
     expect(parts).toEqual(["Siehe Anlage M1.", "Sie regelt das Vesting."]);
   });
 
+  it("separates a Markdown heading from the sentence beneath it", () => {
+    // Live regression: a single newline left heading and sentence glued
+    // together, so the citation on the following line landed in another chunk.
+    const parts = splitSentences(
+      `## Probezeit\nDie Probezeit beträgt sechs Monate [[${DOC_A}:2:§3]].`,
+    );
+    expect(parts).toEqual([
+      "## Probezeit",
+      `Die Probezeit beträgt sechs Monate [[${DOC_A}:2:§3]].`,
+    ]);
+  });
+
   it("splits ordinary prose in both languages", () => {
     expect(splitSentences("Die Probezeit ist sechs Monate. Das ist zulässig.")).toHaveLength(2);
     expect(splitSentences("The preference is 1x. It is non-participating.")).toHaveLength(2);
@@ -87,6 +99,20 @@ describe("requiresCitation", () => {
 
   it("does not let a bare marker count as non-assertive", () => {
     expect(requiresCitation(`Sechs Monate [[${id(PROBEZEIT)}]].`)).toBe(true);
+  });
+
+  it("exempts Markdown headings and short bold labels", () => {
+    expect(requiresCitation("## Probezeit")).toBe(false);
+    expect(requiresCitation("**Wettbewerbsverbot & Karenzentschädigung**")).toBe(false);
+  });
+
+  it("does not let a claim escape by being bold or long", () => {
+    expect(requiresCitation("**Die Probezeit beträgt drei Monate.**")).toBe(true);
+    expect(
+      requiresCitation(
+        "**Die Karenzentschädigung liegt bei dreißig Prozent der zuletzt bezogenen Leistungen**",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -149,6 +175,34 @@ describe("validateGrounding", () => {
   it("dedupes a clause cited by several sentences", () => {
     const answer = `Sechs Monate [[${id(PROBEZEIT)}]]. Das ist die gesetzliche Obergrenze [[${id(PROBEZEIT)}]].`;
     expect(validateGrounding(answer, CITABLE).citations).toHaveLength(1);
+  });
+
+  /**
+   * Regression from a live Sonnet 5 run: a correct answer was failed twice over
+   * — once for a §74 HGB reference the model itself said was not in the
+   * document, once for its own caveat — burning the corrective retry each time.
+   */
+  it("accepts a statutory reference or caveat the model declares non-document", () => {
+    const answer =
+      `Die Karenzentschädigung beträgt 30 % [[${id(KARENZ)}]]. ` +
+      "Der gesetzliche Mindestwert liegt bei 50 % [[statute:§74 Abs. 2 HGB]]. " +
+      "Das ist keine abschließende rechtliche Bewertung [[caveat]].";
+    const res = validateGrounding(answer, CITABLE);
+
+    expect(res.ok).toBe(true);
+    expect(res.uncited).toEqual([]);
+    expect(res.nonDocumentSentences).toBe(2);
+    // A non-document marker is not a citation — nothing extra is persisted.
+    expect(res.citations).toHaveLength(1);
+  });
+
+  it("does not let a non-document marker launder a claim about the documents", () => {
+    // The marker changes what the sentence claims, not whether it is checked:
+    // it is reported as non-document so the UI can label it, never as sourced.
+    const res = validateGrounding("Die Probezeit beträgt drei Monate [[caveat]].", CITABLE);
+    expect(res.citations).toEqual([]);
+    expect(res.nonDocumentSentences).toBe(1);
+    expect(res.sentences[0]?.cited).toBe(false);
   });
 
   it("treats an empty answer as ungrounded but not as a citation failure", () => {

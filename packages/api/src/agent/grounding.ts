@@ -32,11 +32,15 @@ export interface AnswerSentence {
   /** Asserts something about the documents, so FR-5.2 requires a citation. */
   requiresCitation: boolean;
   cited: boolean;
+  /** Flagged by the model as not derived from the documents (statute, context, caveat). */
+  nonDocument: boolean;
 }
 
 export interface GroundingResult {
   ok: boolean;
   sentences: AnswerSentence[];
+  /** How many sentences were declared non-document — the UI marks these visibly. */
+  nonDocumentSentences: number;
   /** Assertions with no resolvable citation — the "could not verify" list. */
   uncited: string[];
   /** Markers that are malformed or name a clause no tool surfaced. */
@@ -106,9 +110,11 @@ export function splitSentences(answer: string): string[] {
     return maskFor(markers.length - 1);
   });
 
+  // Split on every line break, not just blank lines: answers are Markdown, and
+  // a heading glued to the sentence under it produced a bogus "uncited" chunk.
   const parts = masked
-    .split(/\n{2,}/u)
-    .flatMap((para) => para.split(/(?<=[.!?])\s+(?=[^\s])/u))
+    .split(/\n+/u)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+(?=[^\s])/u))
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
@@ -126,6 +132,28 @@ export function splitSentences(answer: string): string[] {
   }
 
   return merged.map((s) => s.replace(MASK_RE, (_m, i: string) => markers[Number(i)]!));
+}
+
+/**
+ * Reserved markers for a sentence that is deliberately *not* a claim about the
+ * documents: a statutory reference (`[[statute:§74 HGB]]`), market context, or
+ * the model's own caveat.
+ *
+ * Without this the contract systematically fails correct answers — a live run
+ * flagged both "§74 HGB requires 50%, which is not in the document" and "this is
+ * not a conclusive legal assessment", burning the corrective retry each time.
+ * Statutory pointers and caveats are things the PRD actively wants (FR-7.6,
+ * and the rules engine already carries `sources` like ["§74 HGB"]), so the fix
+ * is to give the model a way to declare them rather than to loosen the check.
+ *
+ * This is weaker than a clause citation by design, and deliberately visible: the
+ * count is reported so the UI can render these sentences as "not from your
+ * documents" instead of letting them pass as sourced.
+ */
+const NON_DOCUMENT_MARKER_RE = /^(?:statute|context|caveat)\b/iu;
+
+function isNonDocumentMarker(marker: string): boolean {
+  return NON_DOCUMENT_MARKER_RE.test(marker.trim());
 }
 
 /** A fragment that is nothing but citation markers and punctuation. */
@@ -158,8 +186,34 @@ function endsWithAbbreviation(sentence: string): boolean {
 export function requiresCitation(sentence: string): boolean {
   const withoutMarkers = sentence.replace(MARKER_RE, " ").trim();
   if (!/\p{L}/u.test(withoutMarkers)) return false;
+  // A lead-in asserts nothing on its own; its list items carry their own cites.
   if (withoutMarkers.endsWith(":")) return false;
-  return true;
+  return !isHeading(withoutMarkers);
+}
+
+/**
+ * A Markdown heading or short bold label — structure, not a claim. Bounded by
+ * length and by the absence of sentence-ending punctuation so that a real
+ * assertion cannot escape the contract just by being bold.
+ */
+const MAX_HEADING_CHARS = 60;
+
+function isHeading(text: string): boolean {
+  const stripped = text
+    .replace(/^#{1,6}\s+/u, "")
+    .replace(/^[-*+]\s+/u, "")
+    .trim();
+
+  if (/^#{1,6}\s/u.test(text)) {
+    return !/[.!?]$/u.test(stripped) && stripped.length <= MAX_HEADING_CHARS;
+  }
+
+  const bold = /^\*\*(.+)\*\*$/su.exec(stripped);
+  if (!bold) return false;
+  // Test the text inside the emphasis: "**...Monate.**" ends in '**', so
+  // checking the outer string would let a full sentence pass as a label.
+  const inner = bold[1]!.trim();
+  return !/[.!?]$/u.test(inner) && inner.length <= MAX_HEADING_CHARS;
 }
 
 /**
@@ -176,12 +230,19 @@ export function validateGrounding(answer: string, citable: CitableClause[]): Gro
   const uncited: string[] = [];
   const unresolvedMarkers: string[] = [];
   const cited = new Map<string, AnswerCitation>();
+  let nonDocument = 0;
 
   for (const text of splitSentences(answer)) {
     const markers = extractMarkers(text);
     let resolvedHere = 0;
 
+    let nonDocumentHere = 0;
+
     for (const marker of markers) {
+      if (isNonDocumentMarker(marker)) {
+        nonDocumentHere++;
+        continue;
+      }
       if (!clauseIdSchema.safeParse(marker).success) {
         unresolvedMarkers.push(marker);
         continue;
@@ -207,13 +268,23 @@ export function validateGrounding(answer: string, citable: CitableClause[]): Gro
 
     const needed = requiresCitation(text);
     const isCited = resolvedHere > 0;
-    if (needed && !isCited) uncited.push(text);
-    sentences.push({ text, markers, requiresCitation: needed, cited: isCited });
+    if (nonDocumentHere > 0) nonDocument++;
+    // A sentence the model flagged as not-from-the-documents satisfies the
+    // contract without a clause: it makes no claim about the documents.
+    if (needed && !isCited && nonDocumentHere === 0) uncited.push(text);
+    sentences.push({
+      text,
+      markers,
+      requiresCitation: needed,
+      cited: isCited,
+      nonDocument: nonDocumentHere > 0,
+    });
   }
 
   return {
     ok: uncited.length === 0 && unresolvedMarkers.length === 0,
     sentences,
+    nonDocumentSentences: nonDocument,
     uncited,
     unresolvedMarkers,
     citations: [...cited.values()],
@@ -227,7 +298,13 @@ export function validateGrounding(answer: string, citable: CitableClause[]): Gro
  */
 export function buildCritique(result: GroundingResult, citable: CitableClause[]): string {
   const lines: string[] = [
-    "Your previous answer did not satisfy the grounding contract. Fix it and answer again.",
+    "Your previous answer did not satisfy the grounding contract.",
+    "",
+    // Without this the model replies conversationally ("Thanks — here is the
+    // corrected version"), and that acknowledgement is itself an uncited
+    // sentence, so the retry fails on an artefact of the critique.
+    "Reply with the corrected answer and nothing else: no acknowledgement, no preamble, " +
+      "no description of what you changed. The user sees only your answer, not this message.",
   ];
   if (result.uncited.length > 0) {
     lines.push(
@@ -245,6 +322,12 @@ export function buildCritique(result: GroundingResult, citable: CitableClause[])
       ...result.unresolvedMarkers.map((m) => `- [[${m}]]`),
     );
   }
+  lines.push(
+    "",
+    "If a sentence is genuinely not about the documents — a statutory reference, market " +
+      "context, or your own caveat — mark it [[statute:...]], [[context:...]] or [[caveat]] " +
+      "rather than deleting it.",
+  );
   lines.push(
     "",
     "The only citation ids you may use are:",

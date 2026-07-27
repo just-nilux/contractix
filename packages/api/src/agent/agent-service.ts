@@ -66,8 +66,17 @@ export interface AskResult {
     turns: number;
     steps: TraceStep[];
     citableClauseIds: string[];
+    /** Why the corrective regeneration fired — empty when the first answer held. */
+    corrections: CorrectionRecord[];
     stopReason: string;
   };
+}
+
+/** What the validator rejected, kept for the trace drawer and for prompt tuning. */
+export interface CorrectionRecord {
+  turn: number;
+  uncited: string[];
+  unresolvedMarkers: string[];
 }
 
 function textOf(blocks: LlmContentBlock[]): string {
@@ -127,10 +136,11 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
   // stays citable once a tool has surfaced it.
   const citable = new Map<string, CitableClause>();
   const steps: TraceStep[] = [];
+  const corrections: CorrectionRecord[] = [];
   const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
   let turns = 0;
-  let corrections = 0;
+  let correctionCount = 0;
   let stopReason = "end_turn";
   let answer = "";
   let grounding: GroundingResult = validateGrounding("", []);
@@ -140,7 +150,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
 
     // Only stream tokens on a turn that can actually be the answer; a
     // corrective regeneration would otherwise emit a second answer to the UI.
-    const streaming = params.onEvent && corrections === 0;
+    const streaming = params.onEvent && correctionCount === 0;
     const res = await deps.agentLlm.converse({
       system: SYSTEM_PROMPT,
       messages,
@@ -237,10 +247,15 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
     answer = textOf(res.content);
     grounding = validateGrounding(answer, [...citable.values()]);
 
-    if (grounding.ok || corrections >= MAX_CORRECTIONS || res.stopReason === "refusal") break;
+    if (grounding.ok || correctionCount >= MAX_CORRECTIONS || res.stopReason === "refusal") break;
 
     // CRAG: critique -> regenerate, exactly once.
-    corrections++;
+    correctionCount++;
+    corrections.push({
+      turn: turns,
+      uncited: grounding.uncited,
+      unresolvedMarkers: grounding.unresolvedMarkers,
+    });
     params.onEvent?.({
       type: "retry",
       reason:
@@ -260,7 +275,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
     citations: grounding.citations,
     couldNotVerify: grounding.uncited,
     grounded: grounding.ok,
-    corrected: corrections > 0,
+    corrected: correctionCount > 0,
     usage,
     latencyMs: Date.now() - startedAt,
     trace: {
@@ -268,6 +283,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
       turns,
       steps,
       citableClauseIds: [...citable.keys()],
+      corrections,
       stopReason,
     },
   };
