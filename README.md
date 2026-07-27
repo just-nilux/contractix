@@ -44,9 +44,9 @@ A sample of the 31 deterministic rules. Each fires only on the _extracted_ terms
   | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
   | **Extraction** (Haiku 4.5)                    | field accuracy **0.95** · `not_found` precision **1.00** · hallucination **0.00** · citation recall 0.91 |
   | **Rules / red-flag** (deterministic, keyless) | precision **1.00** · recall **1.00** · F1 **1.00** (24 flags / 5 docs, per severity)                     |
-  | **Retrieval** (Jina v4)                       | recall@8 **0.97** · MRR@8 **0.86**                                                                       |
+  | **Retrieval** (Jina v4)                       | recall@8 **1.00** · MRR@8 **1.00**                                                                       |
 
-  The rules gate is keyless and runs on **every PR**; the extraction gate runs live behind `ANTHROPIC_API_KEY`; the retrieval baseline is pending `JINA_API_KEY`. (The first live extraction run also earned its keep — it caught a citation-validation defect that keyless fakes had masked; see [ADR-0007](docs/adr/0007-anchor-first-citation-resolution.md).)
+  The rules gate is keyless and runs on **every PR**; the extraction and retrieval gates run live behind `ANTHROPIC_API_KEY` / `JINA_API_KEY` (both baselines pinned from real runs). (The first live extraction run also earned its keep — it caught a citation-validation defect that keyless fakes had masked; see [ADR-0007](docs/adr/0007-anchor-first-citation-resolution.md).)
 
 > Runs fully offline in **keyless mode** (deterministic fake providers) — `pnpm test`, the rules/red-flag eval, and their CI gates need no API keys. Real extraction/retrieval and their eval baselines require provider keys; see [`.env.example`](.env.example).
 
