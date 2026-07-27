@@ -6,6 +6,7 @@ import { termSheetExtractionSchema } from "./term-sheet.js";
 import { vsopExtractionSchema } from "./vsop.js";
 
 export * from "./field.js";
+export * from "./classification.js";
 export * from "./normalize.js";
 export * from "./employment.js";
 export * from "./term-sheet.js";

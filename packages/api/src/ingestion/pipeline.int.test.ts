@@ -145,7 +145,9 @@ describe("ingestion pipeline end-to-end (fake providers)", () => {
       .returning({ id: documents.id });
     const brokenId = d[0]!.id;
 
-    await expect(runIngestion({ db, blobStore, embeddings }, brokenId)).resolves.toBeUndefined();
+    await expect(runIngestion({ db, blobStore, embeddings }, brokenId)).resolves.toMatchObject({
+      status: "failed",
+    });
 
     const doc = (await db.select().from(documents).where(eq(documents.id, brokenId)))[0];
     expect(doc?.status).toBe("failed");

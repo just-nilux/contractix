@@ -33,6 +33,19 @@ export const documentStatusEnum = pgEnum("document_status", [
   "failed",
 ]);
 
+/**
+ * PRD FR-5.3 analysis lifecycle, distinct from the ingest `status` above:
+ * classify -> extract -> benchmark runs as a chained job after ingestion reaches
+ * `ready`. `pending` until enqueued, `analyzing` while the job runs, `analyzed`
+ * on success, `failed` once BullMQ retries are exhausted.
+ */
+export const analysisStatusEnum = pgEnum("analysis_status", [
+  "pending",
+  "analyzing",
+  "analyzed",
+  "failed",
+]);
+
 export const languageEnum = pgEnum("language", ["de", "en", "mixed"]);
 
 export const documents = pgTable(
@@ -54,6 +67,7 @@ export const documents = pgTable(
     language: languageEnum(),
     type: documentTypeEnum(),
     status: documentStatusEnum().notNull().default("uploaded"),
+    analysisStatus: analysisStatusEnum().notNull().default("pending"),
     parseReport: jsonb().$type<ParseReport>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

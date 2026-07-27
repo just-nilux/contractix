@@ -8,6 +8,7 @@ import { createApp } from "../app.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
 import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index.js";
+import { createAnalysisQueue } from "../queue/analysis.js";
 import { createRedis } from "../queue/connection.js";
 import { createIngestQueue, type IngestQueue } from "../queue/ingest.js";
 import { LocalBlobStore } from "../storage/local.js";
@@ -45,6 +46,7 @@ describe("document upload", () => {
       db,
       blobStore,
       ingestQueue: queue,
+      analysisQueue: createAnalysisQueue(redis),
       providers: {
         embeddings: new FakeEmbeddings(1024),
         reranker: new PassthroughReranker(),
