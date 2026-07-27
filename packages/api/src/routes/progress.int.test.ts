@@ -9,6 +9,7 @@ import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
+import { DEFAULT_DEMO_CONFIG } from "../demo/template.js";
 import {
   createTestTenant,
   deleteTestTenant,
@@ -124,6 +125,7 @@ describe("analysis progress stream", () => {
       auth: TEST_AUTH,
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
+      demo: DEFAULT_DEMO_CONFIG,
     };
     app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });
@@ -215,6 +217,7 @@ describe("analysis progress stream", () => {
         auth: TEST_AUTH,
         rateLimiter: new NoopRateLimiter(),
         rateLimits: DEFAULT_RATE_LIMITS,
+        demo: DEFAULT_DEMO_CONFIG,
       }),
       await sessionCookie(otherTenant),
     );

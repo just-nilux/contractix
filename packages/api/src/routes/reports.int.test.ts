@@ -8,7 +8,14 @@ import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
-import { createTestTenant, deleteTestTenant, sessionCookie, signedIn, TEST_AUTH } from "../auth/testing.js";
+import { DEFAULT_DEMO_CONFIG } from "../demo/template.js";
+import {
+  createTestTenant,
+  deleteTestTenant,
+  sessionCookie,
+  signedIn,
+  TEST_AUTH,
+} from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
 import { runAnalysis } from "../extraction/analysis-service.js";
@@ -64,6 +71,7 @@ describe("report + analyze routes (integration)", () => {
       auth: TEST_AUTH,
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
+      demo: DEFAULT_DEMO_CONFIG,
     };
     // The analysis functions are driven below the HTTP layer here, so this
     // suite needs the tenant id as well as a session for it.

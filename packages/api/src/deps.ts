@@ -10,6 +10,7 @@ import {
   RedisRateLimiter,
 } from "./auth/rate-limit.js";
 import { env } from "./config/env.js";
+import { DEFAULT_DEMO_CONFIG, type DemoConfig } from "./demo/template.js";
 import { db, type Db } from "./db/client.js";
 import { logger } from "./logger.js";
 import { createProviders, type ProviderBundle } from "./providers/index.js";
@@ -33,6 +34,7 @@ export interface AppDeps {
   auth: AuthConfig;
   rateLimiter: RateLimiter;
   rateLimits: RateLimitConfig;
+  demo: DemoConfig;
 }
 
 export interface BuiltDeps extends AppDeps {
@@ -65,6 +67,7 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
     maxUploadBytes: MAX_UPLOAD_BYTES,
     rateLimiter: new RedisRateLimiter(redis),
     rateLimits: DEFAULT_RATE_LIMITS,
+    demo: DEFAULT_DEMO_CONFIG,
     auth: {
       secret: env.SESSION_SECRET,
       ttlSec: env.SESSION_TTL_HOURS * 60 * 60,

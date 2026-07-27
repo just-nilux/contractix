@@ -8,6 +8,7 @@ import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
+import { DEFAULT_DEMO_CONFIG } from "../demo/template.js";
 import { cookieFrom, TEST_AUTH } from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
@@ -64,6 +65,7 @@ describe("document upload", () => {
       auth: TEST_AUTH,
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
+      demo: DEFAULT_DEMO_CONFIG,
     };
     app = createApp(deps);
 
@@ -97,7 +99,11 @@ describe("document upload", () => {
   function uploadRequest(caseId: string, bytes: Uint8Array, filename: string, type: string) {
     const form = new FormData();
     form.set("file", new File([bytes], filename, { type }));
-    return app.request(`/cases/${caseId}/documents`, { method: "POST", body: form, headers: { cookie } });
+    return app.request(`/cases/${caseId}/documents`, {
+      method: "POST",
+      body: form,
+      headers: { cookie },
+    });
   }
 
   it("stores a pdf, enqueues ingestion, and dedupes identical bytes", async () => {

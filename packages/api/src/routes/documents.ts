@@ -29,50 +29,50 @@ const documentSchema = z.object({
 
 const uploadDocument = (deps: AppDeps) =>
   createRoute({
-  method: "post",
-  path: "/cases/{caseId}/documents",
-  summary: "Upload a document (PDF or DOCX) into a case",
-  description:
-    "Content-hash idempotent: re-uploading identical bytes into the same case returns the " +
-    "existing document. Scanned images require the OCR path (Phase 4) and are rejected.",
-  middleware: [rateLimit(deps, "upload"), requireTenant] as const,
-  request: {
-    params: z.object({ caseId: z.uuid() }),
-    body: {
-      content: {
-        "multipart/form-data": {
-          schema: z.object({
-            file: z.any().openapi({ type: "string", format: "binary" }),
-          }),
+    method: "post",
+    path: "/cases/{caseId}/documents",
+    summary: "Upload a document (PDF or DOCX) into a case",
+    description:
+      "Content-hash idempotent: re-uploading identical bytes into the same case returns the " +
+      "existing document. Scanned images require the OCR path (Phase 4) and are rejected.",
+    middleware: [rateLimit(deps, "upload"), requireTenant] as const,
+    request: {
+      params: z.object({ caseId: z.uuid() }),
+      body: {
+        content: {
+          "multipart/form-data": {
+            schema: z.object({
+              file: z.any().openapi({ type: "string", format: "binary" }),
+            }),
+          },
         },
       },
     },
-  },
-  responses: {
-    201: {
-      description: "Document stored and queued for ingestion",
-      content: {
-        "application/json": {
-          schema: z.object({ document: documentSchema, deduplicated: z.literal(false) }),
+    responses: {
+      201: {
+        description: "Document stored and queued for ingestion",
+        content: {
+          "application/json": {
+            schema: z.object({ document: documentSchema, deduplicated: z.literal(false) }),
+          },
         },
       },
-    },
-    200: {
-      description: "Identical bytes already exist in this case",
-      content: {
-        "application/json": {
-          schema: z.object({ document: documentSchema, deduplicated: z.literal(true) }),
+      200: {
+        description: "Identical bytes already exist in this case",
+        content: {
+          "application/json": {
+            schema: z.object({ document: documentSchema, deduplicated: z.literal(true) }),
+          },
         },
       },
+      401: { description: "No session, or the session expired" },
+      404: { description: "Case not found" },
+      409: { description: "Case already holds the maximum of 10 documents" },
+      413: { description: "File exceeds the 25 MB limit" },
+      415: { description: "Unsupported media type" },
+      ...RATE_LIMITED_RESPONSE,
     },
-    401: { description: "No session, or the session expired" },
-    404: { description: "Case not found" },
-    409: { description: "Case already holds the maximum of 10 documents" },
-    413: { description: "File exceeds the 25 MB limit" },
-    415: { description: "Unsupported media type" },
-    ...RATE_LIMITED_RESPONSE,
-  },
-});
+  });
 
 const getDocument = createRoute({
   method: "get",

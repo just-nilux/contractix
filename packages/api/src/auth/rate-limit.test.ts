@@ -13,7 +13,12 @@ class FakeRedis {
   now = 0;
   failNext = false;
 
-  eval(_script: string, _numKeys: number, key: string, windowMs: string): Promise<[number, number]> {
+  eval(
+    _script: string,
+    _numKeys: number,
+    key: string,
+    windowMs: string,
+  ): Promise<[number, number]> {
     if (this.failNext) return Promise.reject(new Error("CONNREFUSED"));
 
     const existing = this.keys.get(key);

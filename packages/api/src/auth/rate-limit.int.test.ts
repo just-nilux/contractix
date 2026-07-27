@@ -13,12 +13,9 @@ import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index
 import { createAnalysisQueue } from "../queue/analysis.js";
 import { createRedis } from "../queue/connection.js";
 import { createIngestQueue } from "../queue/ingest.js";
+import { DEFAULT_DEMO_CONFIG } from "../demo/template.js";
 import { LocalBlobStore } from "../storage/local.js";
-import {
-  DEFAULT_RATE_LIMITS,
-  type RateLimitConfig,
-  RedisRateLimiter,
-} from "./rate-limit.js";
+import { DEFAULT_RATE_LIMITS, type RateLimitConfig, RedisRateLimiter } from "./rate-limit.js";
 import { deleteTestTenant, TEST_AUTH } from "./testing.js";
 
 /** Limits live in deps, not env, precisely so a test can lower them. */
@@ -65,6 +62,7 @@ describe("rate limiting (real redis)", () => {
       auth: TEST_AUTH,
       rateLimiter: new RedisRateLimiter(redis),
       rateLimits: TIGHT,
+      demo: DEFAULT_DEMO_CONFIG,
     };
     app = createApp(deps);
   });

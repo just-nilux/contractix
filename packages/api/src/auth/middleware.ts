@@ -108,10 +108,7 @@ export function sessionMiddleware(deps: AuthDeps): MiddlewareHandler<AppEnv> {
     // Slide the window for an active visitor so a case cannot expire mid-read.
     if (shouldRefresh(verdict.claims)) {
       const expiresAt = new Date(Date.now() + deps.auth.ttlSec * 1000);
-      await deps.db
-        .update(tenants)
-        .set({ expiresAt })
-        .where(eq(tenants.id, verdict.claims.sub));
+      await deps.db.update(tenants).set({ expiresAt }).where(eq(tenants.id, verdict.claims.sub));
       const fresh = await signSession(verdict.claims.sub, deps.auth.secret, deps.auth.ttlSec);
       setSessionCookie(c, fresh, deps.auth.ttlSec, deps.auth.secureCookie);
     }

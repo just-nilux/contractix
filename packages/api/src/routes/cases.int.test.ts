@@ -9,6 +9,7 @@ import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
+import { DEFAULT_DEMO_CONFIG } from "../demo/template.js";
 import {
   createTestTenant,
   deleteTestTenant,
@@ -81,6 +82,7 @@ describe("case list, delete and document limits", () => {
       auth: TEST_AUTH,
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
+      demo: DEFAULT_DEMO_CONFIG,
     };
     tenantId = await createTestTenant(db, "cases");
     app = signedIn(createApp(deps), await sessionCookie(tenantId));
@@ -146,15 +148,11 @@ describe("case list, delete and document limits", () => {
     const res = await app.request(`/cases/${caseId}`, { method: "DELETE" });
     expect(res.status).toBe(204);
 
-    expect(
-      await db.select().from(cases).where(eq(cases.id, caseId)),
-    ).toHaveLength(0);
-    expect(
-      await db.select().from(documents).where(eq(documents.id, document.id)),
-    ).toHaveLength(0);
-    expect(
-      await db.select().from(clauses).where(eq(clauses.documentId, document.id)),
-    ).toHaveLength(0);
+    expect(await db.select().from(cases).where(eq(cases.id, caseId))).toHaveLength(0);
+    expect(await db.select().from(documents).where(eq(documents.id, document.id))).toHaveLength(0);
+    expect(await db.select().from(clauses).where(eq(clauses.documentId, document.id))).toHaveLength(
+      0,
+    );
     expect(await deps.blobStore.exists(document.sha256, ".pdf")).toBe(false);
   });
 

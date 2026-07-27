@@ -9,6 +9,7 @@ import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
+import { DEFAULT_DEMO_CONFIG } from "../demo/template.js";
 import { cookieFrom, deleteTestTenant, sessionCookie, TEST_AUTH } from "../auth/testing.js";
 import { signSession } from "../auth/session.js";
 import { db, pool } from "../db/client.js";
@@ -70,6 +71,7 @@ describe("anonymous sessions", () => {
       auth: TEST_AUTH,
       rateLimiter: new NoopRateLimiter(),
       rateLimits: DEFAULT_RATE_LIMITS,
+      demo: DEFAULT_DEMO_CONFIG,
     };
     app = createApp(deps);
   });
@@ -154,12 +156,12 @@ describe("anonymous sessions", () => {
     const mine = await newSession("mine");
     const theirs = await newSession("theirs");
 
-    expect((await app.request(`/cases/${theirs.caseId}`, { headers: { cookie: mine.cookie } })).status).toBe(
-      404,
-    );
-    expect((await app.request(`/cases/${mine.caseId}`, { headers: { cookie: theirs.cookie } })).status).toBe(
-      404,
-    );
+    expect(
+      (await app.request(`/cases/${theirs.caseId}`, { headers: { cookie: mine.cookie } })).status,
+    ).toBe(404);
+    expect(
+      (await app.request(`/cases/${mine.caseId}`, { headers: { cookie: theirs.cookie } })).status,
+    ).toBe(404);
   });
 
   // The same token, presented the way the Phase-4 MCP server will present it.

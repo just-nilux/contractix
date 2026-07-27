@@ -33,7 +33,10 @@ export async function deleteTestTenant(db: Db, tenantId: string): Promise<void> 
   await db.delete(tenants).where(eq(tenants.id, tenantId));
 }
 
-export async function sessionCookie(tenantId: string, auth: AuthConfig = TEST_AUTH): Promise<string> {
+export async function sessionCookie(
+  tenantId: string,
+  auth: AuthConfig = TEST_AUTH,
+): Promise<string> {
   return `${SESSION_COOKIE}=${await signSession(tenantId, auth.secret, auth.ttlSec)}`;
 }
 

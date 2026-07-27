@@ -35,8 +35,7 @@ export interface SessionClaims {
 }
 
 export type SessionVerdict =
-  | { ok: true; claims: SessionClaims }
-  | { ok: false; reason: "expired" | "invalid" };
+  { ok: true; claims: SessionClaims } | { ok: false; reason: "expired" | "invalid" };
 
 function nowSec(): number {
   return Math.floor(Date.now() / 1000);
@@ -94,12 +93,7 @@ export function shouldRefresh(claims: SessionClaims): boolean {
   return nowSec() >= midpoint;
 }
 
-export function setSessionCookie(
-  c: Context,
-  token: string,
-  ttlSec: number,
-  secure: boolean,
-): void {
+export function setSessionCookie(c: Context, token: string, ttlSec: number, secure: boolean): void {
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "Lax",

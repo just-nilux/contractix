@@ -62,24 +62,24 @@ const getDocumentExtractionRoute = createRoute({
 
 const analyzeDocumentRoute = (deps: AppDeps) =>
   createRoute({
-  method: "post",
-  path: "/documents/{id}/analyze",
-  summary: "(Re)run analysis for a document",
-  description:
-    "Enqueues classify → extract → benchmark. Idempotent: a re-run supersedes the prior analysis.",
-  middleware: [rateLimit(deps, "analyze"), requireTenant] as const,
-  request: { params: z.object({ id: z.uuid() }) },
-  responses: {
-    202: {
-      description: "Analysis enqueued",
-      content: { "application/json": { schema: analyzeAcceptedSchema } },
+    method: "post",
+    path: "/documents/{id}/analyze",
+    summary: "(Re)run analysis for a document",
+    description:
+      "Enqueues classify → extract → benchmark. Idempotent: a re-run supersedes the prior analysis.",
+    middleware: [rateLimit(deps, "analyze"), requireTenant] as const,
+    request: { params: z.object({ id: z.uuid() }) },
+    responses: {
+      202: {
+        description: "Analysis enqueued",
+        content: { "application/json": { schema: analyzeAcceptedSchema } },
+      },
+      401: { description: "No session, or the session expired" },
+      404: { description: "Not found" },
+      409: { description: "Document is not ready (ingestion incomplete or failed)" },
+      ...RATE_LIMITED_RESPONSE,
     },
-    401: { description: "No session, or the session expired" },
-    404: { description: "Not found" },
-    409: { description: "Document is not ready (ingestion incomplete or failed)" },
-    ...RATE_LIMITED_RESPONSE,
-  },
-});
+  });
 
 const getCaseReportRoute = createRoute({
   method: "get",
@@ -99,21 +99,21 @@ const getCaseReportRoute = createRoute({
 
 const analyzeCaseRoute = (deps: AppDeps) =>
   createRoute({
-  method: "post",
-  path: "/cases/{id}/analyze",
-  summary: "(Re)run analysis for every ready document in a case",
-  middleware: [rateLimit(deps, "analyze"), requireTenant] as const,
-  request: { params: z.object({ id: z.uuid() }) },
-  responses: {
-    202: {
-      description: "Analysis enqueued for the case's ready documents",
-      content: { "application/json": { schema: caseAnalyzeAcceptedSchema } },
+    method: "post",
+    path: "/cases/{id}/analyze",
+    summary: "(Re)run analysis for every ready document in a case",
+    middleware: [rateLimit(deps, "analyze"), requireTenant] as const,
+    request: { params: z.object({ id: z.uuid() }) },
+    responses: {
+      202: {
+        description: "Analysis enqueued for the case's ready documents",
+        content: { "application/json": { schema: caseAnalyzeAcceptedSchema } },
+      },
+      401: { description: "No session, or the session expired" },
+      404: { description: "Not found" },
+      ...RATE_LIMITED_RESPONSE,
     },
-    401: { description: "No session, or the session expired" },
-    404: { description: "Not found" },
-    ...RATE_LIMITED_RESPONSE,
-  },
-});
+  });
 
 export function reportRoutes(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>();

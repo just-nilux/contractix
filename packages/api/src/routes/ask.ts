@@ -55,33 +55,33 @@ const askResponseSchema = z.object({
 
 const askRoute = (deps: AppDeps) =>
   createRoute({
-  method: "post",
-  path: "/cases/{id}/ask",
-  summary: "Ask a question about a case (agentic RAG, cited)",
-  description:
-    "Runs the agent tool loop over the case's clauses and returns a cited answer.\n\n" +
-    "Streams Server-Sent Events by default. Send `Accept: application/json` for a single " +
-    "buffered response with the same body as the terminal `done` event.\n\n" +
-    "SSE events: `token` `{text}` — answer text delta; `tool_call` `{name,input}`; " +
-    "`tool_result` `{name,ok,clauseCount}`; `retry` `{reason}` — the one corrective " +
-    "regeneration; `done` — the full response body below; `error` `{message}`.\n\n" +
-    "Every factual sentence carries a `[[clause_id]]` marker resolving to a real clause span. " +
-    "Informational analysis, not legal advice.",
-  middleware: [rateLimit(deps, "ask"), requireTenant] as const,
-  request: {
-    params: z.object({ id: z.uuid() }),
-    body: { content: { "application/json": { schema: askRequestSchema } } },
-  },
-  responses: {
-    200: {
-      description: "Cited answer (SSE stream, or JSON when Accept: application/json)",
-      content: { "application/json": { schema: askResponseSchema } },
+    method: "post",
+    path: "/cases/{id}/ask",
+    summary: "Ask a question about a case (agentic RAG, cited)",
+    description:
+      "Runs the agent tool loop over the case's clauses and returns a cited answer.\n\n" +
+      "Streams Server-Sent Events by default. Send `Accept: application/json` for a single " +
+      "buffered response with the same body as the terminal `done` event.\n\n" +
+      "SSE events: `token` `{text}` — answer text delta; `tool_call` `{name,input}`; " +
+      "`tool_result` `{name,ok,clauseCount}`; `retry` `{reason}` — the one corrective " +
+      "regeneration; `done` — the full response body below; `error` `{message}`.\n\n" +
+      "Every factual sentence carries a `[[clause_id]]` marker resolving to a real clause span. " +
+      "Informational analysis, not legal advice.",
+    middleware: [rateLimit(deps, "ask"), requireTenant] as const,
+    request: {
+      params: z.object({ id: z.uuid() }),
+      body: { content: { "application/json": { schema: askRequestSchema } } },
     },
-    401: { description: "No session, or the session expired" },
-    404: { description: "Case not found" },
-    ...RATE_LIMITED_RESPONSE,
-  },
-});
+    responses: {
+      200: {
+        description: "Cited answer (SSE stream, or JSON when Accept: application/json)",
+        content: { "application/json": { schema: askResponseSchema } },
+      },
+      401: { description: "No session, or the session expired" },
+      404: { description: "Case not found" },
+      ...RATE_LIMITED_RESPONSE,
+    },
+  });
 
 export function askRoutes(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>();

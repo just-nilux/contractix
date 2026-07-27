@@ -6,6 +6,7 @@ import { type AppDeps } from "./deps.js";
 import { askRoutes } from "./routes/ask.js";
 import { caseRoutes } from "./routes/cases.js";
 import { clauseRoutes } from "./routes/clauses.js";
+import { demoRoutes } from "./routes/demo.js";
 import { documentRoutes } from "./routes/documents.js";
 import { fileRoutes } from "./routes/files.js";
 import { healthz } from "./routes/healthz.js";
@@ -32,6 +33,7 @@ export function createApp(deps: AppDeps) {
 
   app.route("/", healthz);
   app.route("/", caseRoutes(deps));
+  app.route("/", demoRoutes(deps));
   app.route("/", documentRoutes(deps));
   app.route("/", fileRoutes(deps));
   app.route("/", searchRoutes(deps));
