@@ -50,6 +50,13 @@
       "when": 1785145759489,
       "tag": "0006_qa-turns",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785171227357,
+      "tag": "0007_sessions-retention",
+      "breakpoints": true
     }
   ]
 }

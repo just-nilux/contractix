@@ -12,6 +12,10 @@ export const cases = pgTable("cases", {
     .notNull()
     .references(() => tenants.id, { onDelete: "cascade" }),
   title: text().notNull(),
+  /** `demo` marks a clone of the seeded template, which makes adoption idempotent. */
+  origin: text({ enum: ["upload", "demo"] })
+    .notNull()
+    .default("upload"),
   retentionDays: integer().notNull().default(30),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
