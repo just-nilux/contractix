@@ -47,7 +47,11 @@ A sample of the 31 deterministic rules. Each fires only on the _extracted_ terms
   | **Rules / red-flag** (deterministic, keyless) | precision **1.00** · recall **1.00** · F1 **1.00** (24 flags / 5 docs, per severity)                     |
   | **Retrieval** (Jina v4)                       | recall@8 **1.00** · MRR@8 **1.00**                                                                       |
 
-  The rules gate is keyless and runs on **every PR**; the extraction and retrieval gates run live behind `ANTHROPIC_API_KEY` / `JINA_API_KEY` (both baselines pinned from real runs). (The first live extraction run also earned its keep — it caught a citation-validation defect that keyless fakes had masked; see [ADR-0007](docs/adr/0007-anchor-first-citation-resolution.md).)
+  The rules gate is keyless and runs on **every PR**; the extraction and retrieval gates run live behind `ANTHROPIC_API_KEY` / `JINA_API_KEY` (both baselines pinned from real runs).
+
+  **The Q&A path is not eval-gated yet.** Its citation integrity is enforced structurally at runtime rather than measured — a marker resolves only against a clause a tool actually returned — but faithfulness and answer relevance need an LLM-as-judge suite with a pinned judge model and versioned prompts (PRD E-2/E-4), which is Phase 4. The 30 gold Q&A pairs that currently score retrieval become its answer-level set then. Same for the adversarial injection suite.
+
+  Running things live has repeatedly earned its keep: the first live extraction run caught a citation-validation defect that keyless fakes had masked ([ADR-0007](docs/adr/0007-anchor-first-citation-resolution.md)), and the first live Q&A run caught a grounding validator strict enough to reject its own correct answers ([ADR-0010](docs/adr/0010-agent-loop-and-grounding-contract.md)).
 
 > Runs fully offline in **keyless mode** (deterministic fake providers) — `pnpm test`, the rules/red-flag eval, and their CI gates need no API keys. Real extraction/retrieval and their eval baselines require provider keys; see [`.env.example`](.env.example).
 

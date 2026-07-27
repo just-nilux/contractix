@@ -28,9 +28,17 @@ pnpm eval:rules            # red-flag precision/recall/F1 vs gold flags (determi
   forced-tool JSON, one repair pass), citations resolve **structurally** (slice the frozen
   clause text, never quote-match), and the rules engine is deterministic — versioned
   `rules.yaml` copy + pure TS checks joined by id, never LLM-judged.
-- `models.yaml` is the only place model IDs/dimensions live; keyless mode (fake providers) must
-  keep working — never make a test depend on a real API key.
+- Read ADR-0010 before touching the agent loop, its tools, or the grounding validator: a
+  `[[clause_id]]` marker resolves **only** if a tool surfaced that clause in the same request
+  (the citable set is built from tool output, never model output), tenant/case scope comes from
+  the HTTP request and is never a tool argument, and a validation failure buys exactly one
+  corrective regeneration before the claim is surfaced under `couldNotVerify`.
+- `models.yaml` is the only place model IDs/dimensions live — including per-role `params`, since
+  request-shape capabilities are model facts (`claude-sonnet-5` 400s on a non-default
+  `temperature`; Haiku 4.5 needs `temperature: 0` to keep extraction deterministic). Keyless mode
+  (fake providers, incl. a scripted agent loop) must keep working — never make a test depend on a
+  real API key.
 - Eval baselines (`packages/eval/baselines/`) change only in deliberate `chore(eval)` commits
   with the PR-template section filled in.
-- `tenant_id` guard in every chunk/clause/extraction/flag query — denormalized precisely so no
-  join is needed.
+- `tenant_id` guard in every chunk/clause/extraction/flag/citation/qa_turn query — denormalized
+  precisely so no join is needed.
