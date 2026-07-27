@@ -1,6 +1,6 @@
 import { type Redis } from "ioredis";
 
-import { loadModelsConfig } from "@contractix/shared";
+import { loadModelsConfig, type ModelsConfig } from "@contractix/shared";
 
 import { env } from "./config/env.js";
 import { db, type Db } from "./db/client.js";
@@ -20,6 +20,8 @@ export interface AppDeps {
   ingestQueue: IngestQueue;
   analysisQueue: AnalysisQueue;
   providers: ProviderBundle;
+  /** Pinned model + pricing config; the cost of a Q&A turn is derived from it. */
+  models: ModelsConfig;
   maxUploadBytes: number;
 }
 
@@ -34,7 +36,8 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
   const blobStore = new LocalBlobStore(env.STORAGE_DIR);
   await blobStore.init();
 
-  const providers = createProviders(loadModelsConfig(), {
+  const models = loadModelsConfig();
+  const providers = createProviders(models, {
     envVars: process.env,
     production: env.NODE_ENV === "production",
     onFallback: (role, reason) =>
@@ -48,6 +51,7 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
     ingestQueue: createIngestQueue(redis),
     analysisQueue: createAnalysisQueue(redis),
     providers,
+    models,
     maxUploadBytes: MAX_UPLOAD_BYTES,
   };
 }

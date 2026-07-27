@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
 import { type AppDeps } from "./deps.js";
+import { askRoutes } from "./routes/ask.js";
 import { caseRoutes } from "./routes/cases.js";
 import { clauseRoutes } from "./routes/clauses.js";
 import { documentRoutes } from "./routes/documents.js";
@@ -17,6 +18,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", searchRoutes(deps));
   app.route("/", clauseRoutes(deps));
   app.route("/", reportRoutes(deps));
+  app.route("/", askRoutes(deps));
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",

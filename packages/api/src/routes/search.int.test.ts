@@ -5,6 +5,8 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { loadModelsConfig } from "@contractix/shared";
+
 import { createApp } from "../app.js";
 import { db, pool } from "../db/client.js";
 import { cases, documents } from "../db/schema/index.js";
@@ -73,6 +75,7 @@ describe("search and clause routes", () => {
         llm: new FakeLlm(),
         agentLlm: new FakeLlm(),
       },
+      models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
     };
     app = createApp(deps);

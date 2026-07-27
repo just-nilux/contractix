@@ -58,6 +58,19 @@ describe("splitSentences", () => {
     ]);
   });
 
+  it("absorbs a marker that trails the final period", () => {
+    // "Sentence. [[id]]" is a cited sentence, not an uncited claim followed by
+    // a stray id — treating it as two sentences would fail a correct answer.
+    const parts = splitSentences(`Die Probezeit beträgt sechs Monate. [[${DOC_A}:2:§3]]`);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toContain("[[");
+  });
+
+  it("is not fooled by document text that looks like a mask placeholder", () => {
+    const parts = splitSentences("Siehe Anlage M1. Sie regelt das Vesting.");
+    expect(parts).toEqual(["Siehe Anlage M1.", "Sie regelt das Vesting."]);
+  });
+
   it("splits ordinary prose in both languages", () => {
     expect(splitSentences("Die Probezeit ist sechs Monate. Das ist zulässig.")).toHaveLength(2);
     expect(splitSentences("The preference is 1x. It is non-participating.")).toHaveLength(2);
