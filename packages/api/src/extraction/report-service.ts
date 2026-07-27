@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { type Db } from "../db/client.js";
 import { cases, citations, clauses, documents, extractions, flags } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 
 /** FR-7.6 — every report says what it is (and is not). */
 const DISCLAIMER =
@@ -227,7 +226,7 @@ export interface ReportDeps {
 
 export interface DocumentReportParams {
   documentId: string;
-  tenantId?: string;
+  tenantId: string;
 }
 
 /**
@@ -239,7 +238,7 @@ export async function getDocumentReport(
   deps: ReportDeps,
   params: DocumentReportParams,
 ): Promise<DocumentReport | null> {
-  const tenantId = params.tenantId ?? (await ensureDevTenant(deps.db));
+  const { tenantId } = params;
 
   const docRows = await deps.db
     .select({
@@ -326,7 +325,7 @@ export async function getDocumentReport(
 
 export interface CaseReportParams {
   caseId: string;
-  tenantId?: string;
+  tenantId: string;
 }
 
 /** Aggregate every document's report in a case, with a case-level severity rollup (FR-6.2). */
@@ -334,7 +333,7 @@ export async function getCaseReport(
   deps: ReportDeps,
   params: CaseReportParams,
 ): Promise<CaseReport | null> {
-  const tenantId = params.tenantId ?? (await ensureDevTenant(deps.db));
+  const { tenantId } = params;
 
   const caseRows = await deps.db
     .select({ id: cases.id, title: cases.title })

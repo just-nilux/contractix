@@ -1,8 +1,8 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
-import { ensureDevTenant } from "../db/tenancy.js";
 import { cases, documents } from "../db/schema/index.js";
+import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import { enqueueIngest } from "../queue/ingest.js";
 import { extensionForMime } from "../storage/local.js";
@@ -30,6 +30,7 @@ const uploadDocument = createRoute({
   description:
     "Content-hash idempotent: re-uploading identical bytes into the same case returns the " +
     "existing document. Scanned images require the OCR path (Phase 4) and are rejected.",
+  middleware: requireTenant,
   request: {
     params: z.object({ caseId: z.uuid() }),
     body: {
@@ -59,6 +60,7 @@ const uploadDocument = createRoute({
         },
       },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Case not found" },
     413: { description: "File exceeds the 25 MB limit" },
     415: { description: "Unsupported media type" },
@@ -69,12 +71,14 @@ const getDocument = createRoute({
   method: "get",
   path: "/documents/{id}",
   summary: "Fetch a document incl. parse report",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     200: {
       description: "Document",
       content: { "application/json": { schema: documentSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
@@ -106,11 +110,11 @@ function toDocumentJson(row: typeof documents.$inferSelect) {
 }
 
 export function documentRoutes(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(uploadDocument, async (c) => {
     const { caseId } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
 
     const owningCase = await deps.db
       .select({ id: cases.id })
@@ -161,7 +165,7 @@ export function documentRoutes(deps: AppDeps) {
 
   app.openapi(getDocument, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const found = await deps.db
       .select()
       .from(documents)

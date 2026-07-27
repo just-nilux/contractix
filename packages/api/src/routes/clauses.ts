@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 
-import { ensureDevTenant } from "../db/tenancy.js";
+import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import { getClause, getClauseContext } from "../retrieval/clause-service.js";
 
@@ -23,12 +23,14 @@ const getClauseRoute = createRoute({
   method: "get",
   path: "/clauses/{id}",
   summary: "Fetch one clause (get_clause tool core)",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     200: {
       description: "Clause with structural citation fields",
       content: { "application/json": { schema: clauseSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
@@ -37,6 +39,7 @@ const getClauseContextRoute = createRoute({
   method: "get",
   path: "/clauses/{id}/context",
   summary: "Fetch a clause with its neighbors (get_clause_context tool core)",
+  middleware: requireTenant,
   request: {
     params: z.object({ id: z.uuid() }),
     query: z.object({ radius: z.coerce.number().int().min(1).max(5).default(1) }),
@@ -54,16 +57,17 @@ const getClauseContextRoute = createRoute({
         },
       },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
 
 export function clauseRoutes(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(getClauseRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const clause = await getClause(deps, { clauseId: id, tenantId });
     if (!clause) return c.body(null, 404);
     return c.json(clause, 200);
@@ -72,7 +76,7 @@ export function clauseRoutes(deps: AppDeps) {
   app.openapi(getClauseContextRoute, async (c) => {
     const { id } = c.req.valid("param");
     const { radius } = c.req.valid("query");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const ctx = await getClauseContext(deps, { clauseId: id, tenantId, radius });
     if (!ctx) return c.body(null, 404);
     return c.json(ctx, 200);

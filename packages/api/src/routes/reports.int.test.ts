@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
+import { createTestTenant, deleteTestTenant, sessionCookie, signedIn, TEST_AUTH } from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
 import { runAnalysis } from "../extraction/analysis-service.js";
@@ -34,7 +35,8 @@ describe("report + analyze routes (integration)", () => {
   let analysisQueue: AnalysisQueue;
   let redis: ReturnType<typeof createRedis>;
   let storageDir: string;
-  let app: ReturnType<typeof createApp>;
+  let app: { request(input: string, init?: RequestInit): Promise<Response> };
+  let tenantId: string;
 
   beforeAll(async () => {
     storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "contractix-report-"));
@@ -58,11 +60,16 @@ describe("report + analyze routes (integration)", () => {
       },
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
+      auth: TEST_AUTH,
     };
-    app = createApp(deps);
+    // The analysis functions are driven below the HTTP layer here, so this
+    // suite needs the tenant id as well as a session for it.
+    tenantId = await createTestTenant(db, "reports");
+    app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });
 
   afterAll(async () => {
+    await deleteTestTenant(db, tenantId);
     await ingestQueue.close();
     await analysisQueue.close();
     await redis.quit();
@@ -103,7 +110,7 @@ describe("report + analyze routes (integration)", () => {
       "analyzing",
     );
 
-    await runAnalysis({ db, llm: new FakeLlm() }, { documentId });
+    await runAnalysis({ db, llm: new FakeLlm() }, { documentId, tenantId });
 
     const reportRes = await app.request(`/documents/${documentId}/report`);
     expect(reportRes.status).toBe(200);

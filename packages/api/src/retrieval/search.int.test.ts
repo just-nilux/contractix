@@ -2,13 +2,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { eq } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, pool } from "../db/client.js";
 import { cases, documents } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
+import { createTestTenant, deleteTestTenant } from "../auth/testing.js";
 import { buildPdf } from "../ingestion/parser/__fixtures__/pdf.js";
 import { runIngestion } from "../ingestion/pipeline.js";
 import { FakeEmbeddings, PassthroughReranker } from "../providers/index.js";
@@ -62,7 +61,7 @@ describe("hybrid search over ingested documents", () => {
     await blobStore.init();
     const embeddings = new FakeEmbeddings(1024);
 
-    tenantId = await ensureDevTenant(db);
+    tenantId = await createTestTenant(db, "retrieval");
     const c = await db
       .insert(cases)
       .values({ tenantId, title: "hybrid search" })
@@ -94,7 +93,7 @@ describe("hybrid search over ingested documents", () => {
   });
 
   afterAll(async () => {
-    await db.delete(cases).where(eq(cases.id, caseId));
+    await deleteTestTenant(db, tenantId);
     await fs.rm(storageDir, { recursive: true, force: true });
     await pool.end();
   });

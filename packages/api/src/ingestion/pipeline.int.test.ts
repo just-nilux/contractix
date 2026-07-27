@@ -9,7 +9,7 @@ import { type Block, canonicalText } from "@contractix/shared";
 
 import { db, pool } from "../db/client.js";
 import { cases, chunks, clauses, documents } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
+import { createTestTenant, deleteTestTenant } from "../auth/testing.js";
 import { FakeEmbeddings } from "../providers/index.js";
 import { LocalBlobStore } from "../storage/local.js";
 import { buildPdf } from "./parser/__fixtures__/pdf.js";
@@ -51,7 +51,7 @@ describe("ingestion pipeline end-to-end (fake providers)", () => {
     blobStore = new LocalBlobStore(storageDir);
     await blobStore.init();
 
-    tenantId = await ensureDevTenant(db);
+    tenantId = await createTestTenant(db, "pipeline");
     const c = await db
       .insert(cases)
       .values({ tenantId, title: "pipeline e2e" })
@@ -75,7 +75,7 @@ describe("ingestion pipeline end-to-end (fake providers)", () => {
   });
 
   afterAll(async () => {
-    await db.delete(cases).where(eq(cases.id, caseId));
+    await deleteTestTenant(db, tenantId);
     await fs.rm(storageDir, { recursive: true, force: true });
     await pool.end();
   });

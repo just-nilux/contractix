@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { assertEmbeddingDims } from "../assert.js";
 import { db, pool } from "../client.js";
-import { ensureDevTenant } from "../tenancy.js";
+import { createTestTenant, deleteTestTenant } from "../../auth/testing.js";
 import { cases, chunks, clauses, documents, EMBEDDING_DIMS } from "./index.js";
 
 describe("chunks schema semantics", () => {
@@ -13,7 +13,7 @@ describe("chunks schema semantics", () => {
   let clauseId: string;
 
   beforeAll(async () => {
-    tenantId = await ensureDevTenant(db);
+    tenantId = await createTestTenant(db, "chunks");
     const c = await db
       .insert(cases)
       .values({ tenantId, title: "schema semantics" })
@@ -51,7 +51,7 @@ describe("chunks schema semantics", () => {
   });
 
   afterAll(async () => {
-    await db.delete(cases).where(sql`${cases.id} = ${caseId}`);
+    await deleteTestTenant(db, tenantId);
     await pool.end();
   });
 

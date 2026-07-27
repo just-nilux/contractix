@@ -2,6 +2,7 @@ import { type Redis } from "ioredis";
 
 import { loadModelsConfig, type ModelsConfig } from "@contractix/shared";
 
+import { type AuthConfig } from "./auth/middleware.js";
 import { env } from "./config/env.js";
 import { db, type Db } from "./db/client.js";
 import { logger } from "./logger.js";
@@ -23,6 +24,7 @@ export interface AppDeps {
   /** Pinned model + pricing config; the cost of a Q&A turn is derived from it. */
   models: ModelsConfig;
   maxUploadBytes: number;
+  auth: AuthConfig;
 }
 
 export interface BuiltDeps extends AppDeps {
@@ -53,5 +55,10 @@ export async function buildAppDeps(): Promise<BuiltDeps> {
     providers,
     models,
     maxUploadBytes: MAX_UPLOAD_BYTES,
+    auth: {
+      secret: env.SESSION_SECRET,
+      ttlSec: env.SESSION_TTL_HOURS * 60 * 60,
+      secureCookie: env.NODE_ENV === "production",
+    },
   };
 }

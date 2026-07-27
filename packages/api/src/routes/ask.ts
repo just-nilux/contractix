@@ -7,7 +7,7 @@ import { costEur } from "@contractix/shared";
 import { type AgentEvent, askCase } from "../agent/agent-service.js";
 import { saveQaTurn } from "../agent/qa-store.js";
 import { cases } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
+import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import { logger } from "../logger.js";
 
@@ -65,6 +65,7 @@ const askRoute = createRoute({
     "regeneration; `done` — the full response body below; `error` `{message}`.\n\n" +
     "Every factual sentence carries a `[[clause_id]]` marker resolving to a real clause span. " +
     "Informational analysis, not legal advice.",
+  middleware: requireTenant,
   request: {
     params: z.object({ id: z.uuid() }),
     body: { content: { "application/json": { schema: askRequestSchema } } },
@@ -74,17 +75,18 @@ const askRoute = createRoute({
       description: "Cited answer (SSE stream, or JSON when Accept: application/json)",
       content: { "application/json": { schema: askResponseSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Case not found" },
   },
 });
 
 export function askRoutes(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(askRoute, async (c) => {
     const { id: caseId } = c.req.valid("param");
     const { question } = c.req.valid("json");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
 
     const owned = await deps.db
       .select({ id: cases.id })

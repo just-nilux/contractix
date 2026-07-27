@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
 import { cases, documents } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
+import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import {
   caseReportSchema,
@@ -25,12 +25,14 @@ const getDocumentReportRoute = createRoute({
   description:
     "Informational analysis, not legal advice. Every field and flag carries citations to the " +
     "exact clause spans they derive from.",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     200: {
       description: "Report",
       content: { "application/json": { schema: documentReportSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
@@ -41,12 +43,14 @@ const analyzeDocumentRoute = createRoute({
   summary: "(Re)run analysis for a document",
   description:
     "Enqueues classify → extract → benchmark. Idempotent: a re-run supersedes the prior analysis.",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     202: {
       description: "Analysis enqueued",
       content: { "application/json": { schema: analyzeAcceptedSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
     409: { description: "Document is not ready (ingestion incomplete or failed)" },
   },
@@ -56,12 +60,14 @@ const getCaseReportRoute = createRoute({
   method: "get",
   path: "/cases/{id}/report",
   summary: "Aggregated red-flag report for every document in a case",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     200: {
       description: "Case report",
       content: { "application/json": { schema: caseReportSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
@@ -70,22 +76,24 @@ const analyzeCaseRoute = createRoute({
   method: "post",
   path: "/cases/{id}/analyze",
   summary: "(Re)run analysis for every ready document in a case",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     202: {
       description: "Analysis enqueued for the case's ready documents",
       content: { "application/json": { schema: caseAnalyzeAcceptedSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
 
 export function reportRoutes(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(getDocumentReportRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const report = await getDocumentReport({ db: deps.db }, { documentId: id, tenantId });
     if (!report) return c.body(null, 404);
     return c.json(report, 200);
@@ -93,7 +101,7 @@ export function reportRoutes(deps: AppDeps) {
 
   app.openapi(analyzeDocumentRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const rows = await deps.db
       .select({ status: documents.status })
       .from(documents)
@@ -114,7 +122,7 @@ export function reportRoutes(deps: AppDeps) {
 
   app.openapi(getCaseReportRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const report = await getCaseReport({ db: deps.db }, { caseId: id, tenantId });
     if (!report) return c.body(null, 404);
     return c.json(report, 200);
@@ -122,7 +130,7 @@ export function reportRoutes(deps: AppDeps) {
 
   app.openapi(analyzeCaseRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const kase = await deps.db
       .select({ id: cases.id })
       .from(cases)

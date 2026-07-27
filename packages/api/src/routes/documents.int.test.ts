@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
+import { cookieFrom, TEST_AUTH } from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { type AppDeps } from "../deps.js";
 import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index.js";
@@ -36,6 +37,8 @@ describe("document upload", () => {
   let redis: ReturnType<typeof createRedis>;
   let storageDir: string;
   let app: ReturnType<typeof createApp>;
+  /** The session POST /cases mints, as a browser would send it back. */
+  let cookie: string;
 
   beforeAll(async () => {
     storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "contractix-test-"));
@@ -57,8 +60,17 @@ describe("document upload", () => {
       },
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
+      auth: TEST_AUTH,
     };
     app = createApp(deps);
+
+    // Mint one session up front so no test depends on another having run first.
+    const seed = await app.request("/cases", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "session seed" }),
+    });
+    cookie = cookieFrom(seed);
   });
 
   afterAll(async () => {
@@ -71,7 +83,7 @@ describe("document upload", () => {
   async function createCase(): Promise<string> {
     const res = await app.request("/cases", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({ title: "upload test case" }),
     });
     expect(res.status).toBe(201);
@@ -82,7 +94,7 @@ describe("document upload", () => {
   function uploadRequest(caseId: string, bytes: Uint8Array, filename: string, type: string) {
     const form = new FormData();
     form.set("file", new File([bytes], filename, { type }));
-    return app.request(`/cases/${caseId}/documents`, { method: "POST", body: form });
+    return app.request(`/cases/${caseId}/documents`, { method: "POST", body: form, headers: { cookie } });
   }
 
   it("stores a pdf, enqueues ingestion, and dedupes identical bytes", async () => {
@@ -129,6 +141,7 @@ describe("document upload", () => {
     const big = await smallApp.request(`/cases/${caseId}/documents`, {
       method: "POST",
       body: form,
+      headers: { cookie },
     });
     expect(big.status).toBe(413);
   });

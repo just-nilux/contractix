@@ -2,15 +2,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { loadModelsConfig } from "@contractix/shared";
 
 import { createApp } from "../app.js";
+import { createTestTenant, deleteTestTenant, sessionCookie, signedIn, TEST_AUTH } from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { cases, documents } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 import { type AppDeps } from "../deps.js";
 import { buildPdf } from "../ingestion/parser/__fixtures__/pdf.js";
 import { runIngestion } from "../ingestion/pipeline.js";
@@ -33,7 +32,8 @@ const OFFER = buildPdf([
 describe("search and clause routes", () => {
   let storageDir: string;
   let caseId: string;
-  let app: ReturnType<typeof createApp>;
+  let app: { request(input: string, init?: RequestInit): Promise<Response> };
+  let tenantId: string;
   let redis: ReturnType<typeof createRedis>;
 
   beforeAll(async () => {
@@ -43,7 +43,7 @@ describe("search and clause routes", () => {
     redis = createRedis(process.env.REDIS_URL ?? "redis://localhost:6380");
 
     const embeddings = new FakeEmbeddings(1024);
-    const tenantId = await ensureDevTenant(db);
+    tenantId = await createTestTenant(db, "route-search");
     const c = await db
       .insert(cases)
       .values({ tenantId, title: "route search" })
@@ -77,12 +77,13 @@ describe("search and clause routes", () => {
       },
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
+      auth: TEST_AUTH,
     };
-    app = createApp(deps);
+    app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });
 
   afterAll(async () => {
-    await db.delete(cases).where(eq(cases.id, caseId));
+    await deleteTestTenant(db, tenantId);
     await fs.rm(storageDir, { recursive: true, force: true });
     await redis.quit();
     await pool.end();

@@ -1,5 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
+import { type AppEnv, sessionMiddleware } from "./auth/middleware.js";
 import { type AppDeps } from "./deps.js";
 import { askRoutes } from "./routes/ask.js";
 import { caseRoutes } from "./routes/cases.js";
@@ -10,7 +11,11 @@ import { reportRoutes } from "./routes/reports.js";
 import { searchRoutes } from "./routes/search.js";
 
 export function createApp(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
+
+  // Reads the session on every request; each route then declares whether it
+  // requires one (`requireTenant`) or starts one (`ensureTenant`).
+  app.use("*", sessionMiddleware(deps));
 
   app.route("/", healthz);
   app.route("/", caseRoutes(deps));

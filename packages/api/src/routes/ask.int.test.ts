@@ -8,9 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadModelsConfig, parseClauseId } from "@contractix/shared";
 
 import { createApp } from "../app.js";
+import { createTestTenant, deleteTestTenant, sessionCookie, signedIn, TEST_AUTH } from "../auth/testing.js";
 import { db, pool } from "../db/client.js";
 import { cases, citations, clauses, qaTurns, tenants } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 import { type AppDeps } from "../deps.js";
 import { buildPdf } from "../ingestion/parser/__fixtures__/pdf.js";
 import { runIngestion } from "../ingestion/pipeline.js";
@@ -53,7 +53,7 @@ describe("ask route (integration)", () => {
   let analysisQueue: AnalysisQueue;
   let redis: ReturnType<typeof createRedis>;
   let storageDir: string;
-  let app: ReturnType<typeof createApp>;
+  let app: { request(input: string, init?: RequestInit): Promise<Response> };
   let tenantId: string;
 
   beforeAll(async () => {
@@ -78,12 +78,14 @@ describe("ask route (integration)", () => {
       },
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
+      auth: TEST_AUTH,
     };
-    app = createApp(deps);
-    tenantId = await ensureDevTenant(db);
+    tenantId = await createTestTenant(db, "ask");
+    app = signedIn(createApp(deps), await sessionCookie(tenantId));
   });
 
   afterAll(async () => {
+    await deleteTestTenant(db, tenantId);
     await ingestQueue.close();
     await analysisQueue.close();
     await redis.quit();
