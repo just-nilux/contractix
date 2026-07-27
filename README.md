@@ -33,11 +33,12 @@ A sample of the 31 deterministic rules. Each fires only on the _extracted_ terms
 
 ## Status
 
-**Phases 0–2 complete** — the ingestion + retrieval spine and the extraction + red-flag engine are built and tested. Phase 3 (agentic Q&A, full report, web UI) is next. See [PRD.md](PRD.md) for the full specification and roadmap.
+**Phases 0–2 complete; Phase 3 in progress** — the ingestion + retrieval spine, the extraction + red-flag engine, and the agentic Q&A path are built and tested. The web UI and auth are the remaining Phase-3 slices. See [PRD.md](PRD.md) for the full specification and roadmap.
 
 - **Ingestion & retrieval** — layout-aware PDF/DOCX parse → clause segmentation → chunking → pgvector + full-text + trigram hybrid search with cross-encoder rerank.
 - **Extraction** — schema-first, per-field-cited extraction (employment offers/contracts, VSOP/ESOP, term sheets); every field carries a structural citation to the exact clause span, and `not_found` is a first-class value, never inferred.
 - **Red-flag engine** — 31 deterministic, versioned rules over the extracted schema ([sampled above](#what-it-catches)), each citing the clause(s) that triggered it and its source. Deterministic and auditable — _not_ LLM-judged, so the same document always yields the same flags.
+- **Agentic Q&A** — `POST /cases/{id}/ask` streams a cited answer over SSE. A hand-rolled tool loop (search, clause lookup, extraction, red flags, deterministic arithmetic) answers the question, then a validator checks the result: every factual sentence must carry a `[[clause_id]]` marker naming a clause a tool actually returned, resolved structurally to a frozen span — never quote-matched. A failure buys one corrective regeneration; anything still unsupported is returned under "could not verify" rather than dropped. Each turn persists its trace, tokens, cost and latency.
 - **Evals** — golden-corpus gates in CI, with pinned real numbers on the demo corpus:
 
   | gate                                          | key metrics                                                                                              |
