@@ -154,10 +154,18 @@ export class FakeLlm implements LlmProvider {
       });
     }
 
-    const cited = [...new Set(results.flatMap((r) => r.content.match(CLAUSE_ID_RE) ?? []))].slice(
-      0,
-      2,
-    );
+    // Tool results first, then any text block: the agent loop supplies clause
+    // ids through tool output, but the narrative report writer hands them over
+    // in the user message, and keyless CI must exercise both.
+    const scannable = [
+      ...results.map((r) => r.content),
+      ...opts.messages.flatMap((m) =>
+        m.content
+          .filter((b): b is Extract<LlmContentBlock, { type: "text" }> => b.type === "text")
+          .map((b) => b.text),
+      ),
+    ];
+    const cited = [...new Set(scannable.flatMap((t) => t.match(CLAUSE_ID_RE) ?? []))].slice(0, 2);
     const text =
       cited.length > 0
         ? `Keyless mode returns no model-generated analysis; the retrieved clause is cited so the citation path stays verifiable. ${cited

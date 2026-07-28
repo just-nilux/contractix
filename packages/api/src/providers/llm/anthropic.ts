@@ -177,11 +177,18 @@ export class AnthropicLlm implements LlmProvider {
         role: m.role,
         content: m.content.map(toWireBlock),
       })),
-      tools: opts.tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        input_schema: t.jsonSchema,
-      })),
+      // Omitted entirely when empty: the narrative report writer converses
+      // with no tools, and an empty `tools` array is a different request shape
+      // than no tools at all.
+      ...(opts.tools.length > 0
+        ? {
+            tools: opts.tools.map((t) => ({
+              name: t.name,
+              description: t.description,
+              input_schema: t.jsonSchema,
+            })),
+          }
+        : {}),
     };
 
     return opts.onTextDelta
