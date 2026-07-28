@@ -3,6 +3,7 @@ import { Link, Outlet } from "react-router";
 import { DISCLAIMER } from "@contractix/shared/schemas";
 
 import { CitationProvider } from "../citations/citation-context.js";
+import { ViewerDrawer } from "../features/viewer/viewer-drawer.js";
 import { DisclaimerGate } from "./disclaimer-gate.js";
 
 /**
@@ -40,6 +41,7 @@ export function AppShell() {
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
           <Outlet />
         </main>
+        <ViewerDrawer />
       </CitationProvider>
 
       <footer className="border-t border-slate-200 bg-slate-50">
