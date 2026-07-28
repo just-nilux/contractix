@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
-import { costEur } from "@contractix/shared";
+import { askResponseSchema, costEur } from "@contractix/shared";
 
 import { type AgentEvent, askCase } from "../agent/agent-service.js";
 import { saveQaTurn } from "../agent/qa-store.js";
@@ -18,39 +18,6 @@ const DISCLAIMER =
 
 const askRequestSchema = z.object({
   question: z.string().min(1).max(2_000),
-});
-
-const answerCitationSchema = z.object({
-  clauseId: z.uuid(),
-  serializedClauseId: z.string(),
-  documentId: z.uuid(),
-  page: z.number().int(),
-  charStart: z.number().int(),
-  charEnd: z.number().int(),
-  verbatimAnchor: z.string(),
-});
-
-const askResponseSchema = z.object({
-  turnId: z.uuid(),
-  question: z.string(),
-  answer: z.string(),
-  disclaimer: z.string(),
-  citations: z.array(answerCitationSchema),
-  /**
-   * Assertions the validator could not tie to a retrieved clause. Surfaced
-   * rather than dropped (FR-5.2) — an unverifiable claim the user can see is
-   * safer than one silently removed.
-   */
-  couldNotVerify: z.array(z.string()),
-  grounded: z.boolean(),
-  corrected: z.boolean(),
-  usage: z.object({
-    inputTokens: z.number().int(),
-    outputTokens: z.number().int(),
-    costEur: z.number(),
-    latencyMs: z.number().int(),
-  }),
-  trace: z.unknown(),
 });
 
 const askRoute = (deps: AppDeps) =>

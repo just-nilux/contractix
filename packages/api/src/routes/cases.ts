@@ -1,3 +1,4 @@
+import { caseListSchema, caseSchema, caseWithDocumentsSchema } from "@contractix/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, count, desc, eq } from "drizzle-orm";
 
@@ -6,22 +7,6 @@ import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { cases, documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 import { sweepUnreferencedBlobs } from "../storage/sweep.js";
-
-const caseSchema = z.object({
-  id: z.uuid(),
-  title: z.string(),
-  retentionDays: z.number().int(),
-  createdAt: z.iso.datetime(),
-});
-
-const documentSummarySchema = z.object({
-  id: z.uuid(),
-  filename: z.string(),
-  status: z.enum(["uploaded", "processing", "ready", "failed"]),
-  analysisStatus: z.enum(["pending", "analyzing", "analyzed", "failed"]),
-  language: z.enum(["de", "en", "mixed"]).nullable(),
-  pageCount: z.number().int().nullable(),
-});
 
 /**
  * The one route that starts a session, along with `POST /demo/adopt` - hence
@@ -65,9 +50,7 @@ const listCases = createRoute({
       description: "Cases",
       content: {
         "application/json": {
-          schema: z.object({
-            cases: z.array(caseSchema.extend({ documentCount: z.number().int() })),
-          }),
+          schema: caseListSchema,
         },
       },
     },
@@ -105,7 +88,7 @@ const getCase = createRoute({
       description: "Case with document summaries",
       content: {
         "application/json": {
-          schema: caseSchema.extend({ documents: z.array(documentSummarySchema) }),
+          schema: caseWithDocumentsSchema,
         },
       },
     },

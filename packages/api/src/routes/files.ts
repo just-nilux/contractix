@@ -16,38 +16,12 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
-import { type Block } from "@contractix/shared";
+import { type Block, documentLayoutSchema } from "@contractix/shared";
 
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 import { extensionForMime } from "../storage/local.js";
-
-const layoutSchema = z.object({
-  documentId: z.uuid(),
-  mimeType: z.string(),
-  pageCount: z.number().int().nullable(),
-  /** False for DOCX and for any document whose sidecar is missing: use the text viewer. */
-  geometry: z.boolean(),
-  pages: z.array(
-    z.object({
-      page: z.number().int().positive(),
-      width: z.number().positive(),
-      height: z.number().positive(),
-    }),
-  ),
-  blocks: z.array(
-    z.object({
-      page: z.number().int().positive(),
-      x: z.number(),
-      y: z.number(),
-      width: z.number(),
-      height: z.number(),
-      charStart: z.number().int().nonnegative(),
-      charEnd: z.number().int().nonnegative(),
-    }),
-  ),
-});
 
 const getFile = createRoute({
   method: "get",
@@ -79,7 +53,10 @@ const getLayout = createRoute({
   middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
-    200: { description: "Layout", content: { "application/json": { schema: layoutSchema } } },
+    200: {
+      description: "Layout",
+      content: { "application/json": { schema: documentLayoutSchema } },
+    },
     304: { description: "Not modified" },
     401: { description: "No session, or the session expired" },
     404: { description: "Not found" },

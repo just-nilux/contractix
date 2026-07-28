@@ -21,6 +21,8 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
+import { type AnalysisPhase, progressSchema } from "@contractix/shared";
+
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { cases, documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
@@ -30,25 +32,6 @@ const HEARTBEAT_MS = 15_000;
 /** A browser tab left open overnight should not hold a connection forever. */
 const MAX_STREAM_MS = 5 * 60_000;
 
-const PHASES = ["queued", "parsing", "analyzing", "ready", "failed"] as const;
-type Phase = (typeof PHASES)[number];
-
-const documentProgressSchema = z.object({
-  documentId: z.uuid(),
-  filename: z.string(),
-  phase: z.enum(PHASES),
-  status: z.string(),
-  analysisStatus: z.string(),
-  /** Per-page parse outcomes; PRD §9 wants parse failure surfaced per page. */
-  pageFailures: z.array(z.number().int()),
-});
-
-const progressSchema = z.object({
-  caseId: z.uuid(),
-  documents: z.array(documentProgressSchema),
-  done: z.boolean(),
-});
-
 interface DocRow {
   id: string;
   filename: string;
@@ -57,7 +40,7 @@ interface DocRow {
   parseReport: { pages?: { page: number; status: string }[] } | null;
 }
 
-function phaseOf(row: DocRow): Phase {
+function phaseOf(row: DocRow): AnalysisPhase {
   if (row.status === "failed" || row.analysisStatus === "failed") return "failed";
   if (row.status === "uploaded") return "queued";
   if (row.status === "processing") return "parsing";
@@ -66,7 +49,7 @@ function phaseOf(row: DocRow): Phase {
   return "queued";
 }
 
-const TERMINAL: readonly Phase[] = ["ready", "failed"];
+const TERMINAL: readonly AnalysisPhase[] = ["ready", "failed"];
 
 function snapshot(caseId: string, rows: DocRow[]) {
   const docs = rows.map((row) => ({

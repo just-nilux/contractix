@@ -6,7 +6,8 @@
  * anyone has a session. `POST /demo/adopt` mints one if needed and clones the
  * template case into it, so the visitor owns everything they then see.
  */
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { demoAdoptSchema, demoCatalogSchema } from "@contractix/shared";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, count, eq } from "drizzle-orm";
 
 import { type AppEnv, ensureTenant, tenantOf } from "../auth/middleware.js";
@@ -19,18 +20,6 @@ import { logger } from "../logger.js";
 
 const ADOPTED_TITLE = "Demo Corpus";
 
-const catalogSchema = z.object({
-  available: z.boolean(),
-  documents: z.array(
-    z.object({
-      filename: z.string(),
-      type: z.string().nullable(),
-      language: z.string().nullable(),
-      pageCount: z.number().int().nullable(),
-    }),
-  ),
-});
-
 const getCatalog = createRoute({
   method: "get",
   path: "/demo",
@@ -41,7 +30,7 @@ const getCatalog = createRoute({
   responses: {
     200: {
       description: "Demo catalogue",
-      content: { "application/json": { schema: catalogSchema } },
+      content: { "application/json": { schema: demoCatalogSchema } },
     },
   },
 });
@@ -61,7 +50,7 @@ const adoptRoute = (deps: AppDeps) =>
         description: "Already adopted; the existing case",
         content: {
           "application/json": {
-            schema: z.object({ caseId: z.uuid(), documentCount: z.number().int() }),
+            schema: demoAdoptSchema,
           },
         },
       },
@@ -69,7 +58,7 @@ const adoptRoute = (deps: AppDeps) =>
         description: "Demo corpus cloned into this session",
         content: {
           "application/json": {
-            schema: z.object({ caseId: z.uuid(), documentCount: z.number().int() }),
+            schema: demoAdoptSchema,
           },
         },
       },

@@ -32,6 +32,27 @@ export default tseslint.config(
     },
   },
   {
+    // The web imports @contractix/shared/schemas directly, so nothing reachable
+    // from there may touch Node built-ins — the package root pulls `node:fs` via
+    // the models loader, which is exactly why the subpath exists. Mechanical,
+    // so the constraint survives someone adding a convenient helper.
+    files: ["packages/shared/src/schemas/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["node:*", "fs", "path", "url", "crypto"],
+              message:
+                "packages/shared/src/schemas must stay browser-safe — the web imports it directly.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["**/*.{js,mjs,cjs}"],
     extends: [tseslint.configs.disableTypeChecked],
   },
