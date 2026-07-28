@@ -13,6 +13,7 @@ import { demoRoutes } from "./routes/demo.js";
 import { documentRoutes } from "./routes/documents.js";
 import { fileRoutes } from "./routes/files.js";
 import { healthz } from "./routes/healthz.js";
+import { narrativeRoutes } from "./routes/narrative.js";
 import { progressRoutes } from "./routes/progress.js";
 import { reportRoutes } from "./routes/reports.js";
 import { searchRoutes } from "./routes/search.js";
@@ -69,6 +70,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", clauseRoutes(deps));
   app.route("/", progressRoutes(deps));
   app.route("/", reportRoutes(deps));
+  app.route("/", narrativeRoutes(deps));
   app.route("/", askRoutes(deps));
 
   app.doc("/openapi.json", {
