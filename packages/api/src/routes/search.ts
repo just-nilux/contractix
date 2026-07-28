@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
 import { cases } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
+import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import { searchClauses } from "../retrieval/search-service.js";
 
@@ -29,6 +29,7 @@ const searchRoute = createRoute({
   description:
     "pgvector HNSW + language-aware full-text + trigram, fused with RRF (k=60), " +
     "reranked to top-k clauses. Every hit carries clause_ref + char offsets (FR-1.4).",
+  middleware: requireTenant,
   request: {
     params: z.object({ caseId: z.uuid() }),
     query: z.object({
@@ -46,17 +47,18 @@ const searchRoute = createRoute({
         },
       },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Case not found" },
   },
 });
 
 export function searchRoutes(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(searchRoute, async (c) => {
     const { caseId } = c.req.valid("param");
     const { q, doc_id, top_k } = c.req.valid("query");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
 
     const owningCase = await deps.db
       .select({ id: cases.id })

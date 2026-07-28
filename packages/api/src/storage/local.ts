@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 
 /**
  * Content-addressed blob store on local disk (PRD v1; S3-compatible later).
@@ -34,6 +36,33 @@ export class LocalBlobStore {
 
   async get(sha256: string, ext: string): Promise<Buffer> {
     return fs.readFile(this.blobPath(sha256, ext));
+  }
+
+  /** Streams a blob to an HTTP response without buffering 25 MB per request. */
+  createReadStream(sha256: string, ext: string): ReadableStream<Uint8Array> {
+    return Readable.toWeb(
+      createReadStream(this.blobPath(sha256, ext)),
+    ) as ReadableStream<Uint8Array>;
+  }
+
+  async exists(sha256: string, ext: string): Promise<boolean> {
+    try {
+      await fs.access(this.blobPath(sha256, ext));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** FR-7.3 hard delete: the blob and any sidecars derived from it. */
+  async remove(sha256: string, ext: string): Promise<void> {
+    await fs.rm(this.blobPath(sha256, ext), { force: true });
+    const entries = await fs.readdir(this.root).catch(() => []);
+    for (const entry of entries) {
+      if (entry.startsWith(`${sha256}.`) && entry.endsWith(".json")) {
+        await fs.rm(path.join(this.root, entry), { force: true });
+      }
+    }
   }
 
   async writeSidecar(sha256: string, name: string, data: unknown): Promise<void> {

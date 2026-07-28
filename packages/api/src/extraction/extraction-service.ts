@@ -10,7 +10,6 @@ import { z, type ZodError } from "zod";
 
 import { type Db } from "../db/client.js";
 import { citations, clauses, documents, extractions } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 import { type JsonSchema, type LlmProvider, type TokenUsage } from "../providers/index.js";
 import { type ClauseForCitation, resolveFieldCitations } from "./citation-resolver.js";
 
@@ -32,8 +31,8 @@ export interface ExtractionDeps {
 
 export interface ExtractionParams {
   documentId: string;
-  /** Defaults to the dev tenant; the eval/demo path passes the demo tenant. */
-  tenantId?: string;
+  /** FR-7.4 scope; the eval/demo path passes the demo tenant. */
+  tenantId: string;
 }
 
 export interface ExtractionResult {
@@ -191,7 +190,7 @@ export async function runExtraction(
   deps: ExtractionDeps,
   params: ExtractionParams,
 ): Promise<ExtractionResult> {
-  const tenantId = params.tenantId ?? (await ensureDevTenant(deps.db));
+  const { tenantId } = params;
   const doc = await loadDocument(deps.db, params.documentId, tenantId);
   if (!doc) throw new Error(`document not found in tenant: ${params.documentId}`);
 

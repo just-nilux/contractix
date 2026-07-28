@@ -42,6 +42,14 @@ export const pageReportSchema = z.object({
   status: z.enum(["ok", "empty", "error"]),
   chars: z.number().int().nonnegative(),
   error: z.string().optional(),
+  /**
+   * Page box in PDF points. Absent for formats without geometry (DOCX) and for
+   * documents parsed before this was recorded. The viewer needs it to scale a
+   * block bbox to rendered pixels, and reporting it beats having the client
+   * infer it from whatever pdf.js happens to return.
+   */
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
 });
 export type PageReport = z.infer<typeof pageReportSchema>;
 

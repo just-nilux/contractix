@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "cases_one_demo_per_tenant" ON "cases" USING btree ("tenant_id") WHERE "cases"."origin" = 'demo';

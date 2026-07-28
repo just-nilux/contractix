@@ -1,11 +1,15 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
-import { ensureDevTenant } from "../db/tenancy.js";
 import { cases, documents } from "../db/schema/index.js";
+import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
+import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { enqueueIngest } from "../queue/ingest.js";
 import { extensionForMime } from "../storage/local.js";
+
+/** PRD FR-1.1: "1-10 documents per case". */
+const MAX_DOCUMENTS_PER_CASE = 10;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -23,58 +27,65 @@ const documentSchema = z.object({
   parseReport: z.unknown().nullable(),
 });
 
-const uploadDocument = createRoute({
-  method: "post",
-  path: "/cases/{caseId}/documents",
-  summary: "Upload a document (PDF or DOCX) into a case",
-  description:
-    "Content-hash idempotent: re-uploading identical bytes into the same case returns the " +
-    "existing document. Scanned images require the OCR path (Phase 4) and are rejected.",
-  request: {
-    params: z.object({ caseId: z.uuid() }),
-    body: {
-      content: {
-        "multipart/form-data": {
-          schema: z.object({
-            file: z.any().openapi({ type: "string", format: "binary" }),
-          }),
+const uploadDocument = (deps: AppDeps) =>
+  createRoute({
+    method: "post",
+    path: "/cases/{caseId}/documents",
+    summary: "Upload a document (PDF or DOCX) into a case",
+    description:
+      "Content-hash idempotent: re-uploading identical bytes into the same case returns the " +
+      "existing document. Scanned images require the OCR path (Phase 4) and are rejected.",
+    middleware: [rateLimit(deps, "upload"), requireTenant] as const,
+    request: {
+      params: z.object({ caseId: z.uuid() }),
+      body: {
+        content: {
+          "multipart/form-data": {
+            schema: z.object({
+              file: z.any().openapi({ type: "string", format: "binary" }),
+            }),
+          },
         },
       },
     },
-  },
-  responses: {
-    201: {
-      description: "Document stored and queued for ingestion",
-      content: {
-        "application/json": {
-          schema: z.object({ document: documentSchema, deduplicated: z.literal(false) }),
+    responses: {
+      201: {
+        description: "Document stored and queued for ingestion",
+        content: {
+          "application/json": {
+            schema: z.object({ document: documentSchema, deduplicated: z.literal(false) }),
+          },
         },
       },
-    },
-    200: {
-      description: "Identical bytes already exist in this case",
-      content: {
-        "application/json": {
-          schema: z.object({ document: documentSchema, deduplicated: z.literal(true) }),
+      200: {
+        description: "Identical bytes already exist in this case",
+        content: {
+          "application/json": {
+            schema: z.object({ document: documentSchema, deduplicated: z.literal(true) }),
+          },
         },
       },
+      401: { description: "No session, or the session expired" },
+      404: { description: "Case not found" },
+      409: { description: "Case already holds the maximum of 10 documents" },
+      413: { description: "File exceeds the 25 MB limit" },
+      415: { description: "Unsupported media type" },
+      ...RATE_LIMITED_RESPONSE,
     },
-    404: { description: "Case not found" },
-    413: { description: "File exceeds the 25 MB limit" },
-    415: { description: "Unsupported media type" },
-  },
-});
+  });
 
 const getDocument = createRoute({
   method: "get",
   path: "/documents/{id}",
   summary: "Fetch a document incl. parse report",
+  middleware: requireTenant,
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     200: {
       description: "Document",
       content: { "application/json": { schema: documentSchema } },
     },
+    401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
   },
 });
@@ -106,11 +117,11 @@ function toDocumentJson(row: typeof documents.$inferSelect) {
 }
 
 export function documentRoutes(deps: AppDeps) {
-  const app = new OpenAPIHono();
+  const app = new OpenAPIHono<AppEnv>();
 
-  app.openapi(uploadDocument, async (c) => {
+  app.openapi(uploadDocument(deps), async (c) => {
     const { caseId } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
 
     const owningCase = await deps.db
       .select({ id: cases.id })
@@ -140,6 +151,14 @@ export function documentRoutes(deps: AppDeps) {
       return c.json({ document: toDocumentJson(dup), deduplicated: true as const }, 200);
     }
 
+    // FR-1.1 caps a case at 10 documents. Checked after dedupe, so re-uploading
+    // a document already in the case never trips it.
+    const [{ value: docCount } = { value: 0 }] = await deps.db
+      .select({ value: count() })
+      .from(documents)
+      .where(and(eq(documents.caseId, caseId), eq(documents.tenantId, tenantId)));
+    if (docCount >= MAX_DOCUMENTS_PER_CASE) return c.body(null, 409);
+
     const inserted = await deps.db
       .insert(documents)
       .values({
@@ -161,7 +180,7 @@ export function documentRoutes(deps: AppDeps) {
 
   app.openapi(getDocument, async (c) => {
     const { id } = c.req.valid("param");
-    const tenantId = await ensureDevTenant(deps.db);
+    const tenantId = tenantOf(c);
     const found = await deps.db
       .select()
       .from(documents)

@@ -50,6 +50,27 @@
       "when": 1785145759489,
       "tag": "0006_qa-turns",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785171227357,
+      "tag": "0007_sessions-retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785173487923,
+      "tag": "0008_one-demo-case-per-tenant",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785244605605,
+      "tag": "0009_enum-domain-checks",
+      "breakpoints": true
     }
   ]
 }

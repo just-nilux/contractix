@@ -1,0 +1,2 @@
+ALTER TABLE "tenants" ADD CONSTRAINT "tenants_kind_check" CHECK ("tenants"."kind" in ('anon', 'demo', 'user'));--> statement-breakpoint
+ALTER TABLE "cases" ADD CONSTRAINT "cases_origin_check" CHECK ("cases"."origin" in ('upload', 'demo'));

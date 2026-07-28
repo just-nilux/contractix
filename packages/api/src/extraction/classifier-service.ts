@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { type Db } from "../db/client.js";
 import { clauses, documents } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 import { type JsonSchema, type LlmProvider, type TokenUsage } from "../providers/index.js";
 
 const TOOL_NAME = "classify_document";
@@ -32,8 +31,8 @@ export interface ClassifierDeps {
 
 export interface ClassifierParams {
   documentId: string;
-  /** Defaults to the dev tenant; the analysis job passes the document's tenant. */
-  tenantId?: string;
+  /** FR-7.4 scope; the analysis job passes the document's tenant. */
+  tenantId: string;
 }
 
 export interface ClassificationResult {
@@ -99,7 +98,7 @@ export async function classifyDocument(
   deps: ClassifierDeps,
   params: ClassifierParams,
 ): Promise<ClassificationResult> {
-  const tenantId = params.tenantId ?? (await ensureDevTenant(deps.db));
+  const { tenantId } = params;
 
   const docRows = await deps.db
     .select({ id: documents.id, language: documents.language })

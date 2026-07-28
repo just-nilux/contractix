@@ -5,7 +5,6 @@
  */
 export { db, pool, createDb, type Db } from "./db/client.js";
 export * as schema from "./db/schema/index.js";
-export { ensureDevTenant } from "./db/tenancy.js";
 export { runIngestion, type PipelineDeps } from "./ingestion/pipeline.js";
 export {
   seedDemoCorpus,

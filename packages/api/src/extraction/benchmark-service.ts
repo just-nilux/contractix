@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm";
 
 import { type Db } from "../db/client.js";
 import { citations, documents, extractions, flags } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 
 export interface BenchmarkDeps {
   db: Db;
@@ -12,7 +11,7 @@ export interface BenchmarkDeps {
 
 export interface BenchmarkParams {
   documentId: string;
-  tenantId?: string;
+  tenantId: string;
 }
 
 export interface PersistedFlag {
@@ -36,7 +35,7 @@ export async function benchmarkDocument(
   deps: BenchmarkDeps,
   params: BenchmarkParams,
 ): Promise<PersistedFlag[]> {
-  const tenantId = params.tenantId ?? (await ensureDevTenant(deps.db));
+  const { tenantId } = params;
   const doc = (
     await deps.db
       .select({ id: documents.id, type: documents.type, caseId: documents.caseId })

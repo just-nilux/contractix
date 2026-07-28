@@ -3,7 +3,6 @@ import { and, eq } from "drizzle-orm";
 
 import { type Db } from "../db/client.js";
 import { documents } from "../db/schema/index.js";
-import { ensureDevTenant } from "../db/tenancy.js";
 import { type LlmProvider, type TokenUsage } from "../providers/index.js";
 import { benchmarkDocument, type PersistedFlag } from "./benchmark-service.js";
 import { classifyDocument } from "./classifier-service.js";
@@ -18,8 +17,8 @@ export interface AnalysisDeps {
 
 export interface AnalysisParams {
   documentId: string;
-  /** Defaults to the dev tenant; the analysis worker passes the document's tenant. */
-  tenantId?: string;
+  /** FR-7.4 scope; the analysis worker passes the document's tenant. */
+  tenantId: string;
 }
 
 export interface AnalysisResult {
@@ -64,7 +63,7 @@ export async function runAnalysis(
   deps: AnalysisDeps,
   params: AnalysisParams,
 ): Promise<AnalysisResult> {
-  const tenantId = params.tenantId ?? (await ensureDevTenant(deps.db));
+  const { tenantId } = params;
   const { documentId } = params;
 
   const owned = await deps.db
