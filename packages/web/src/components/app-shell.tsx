@@ -2,6 +2,8 @@ import { Link, Outlet } from "react-router";
 
 import { DISCLAIMER } from "@contractix/shared/schemas";
 
+import { DisclaimerGate } from "./disclaimer-gate.js";
+
 /**
  * Header, routed content, and the persistent half of FR-7.6.
  *
@@ -14,6 +16,9 @@ import { DISCLAIMER } from "@contractix/shared/schemas";
 export function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
+      {/* Above everything: FR-7.6 wants this seen before any analysis is. */}
+      <DisclaimerGate />
+
       <header className="border-b border-slate-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="text-lg font-semibold tracking-tight">

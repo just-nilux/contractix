@@ -13,6 +13,7 @@ export default defineConfig({
     name: "web",
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["./src/test/setup.ts"],
     // Nothing here asserts on styles, and compiling Tailwind per test file is
     // pure cost.
     css: false,
