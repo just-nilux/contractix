@@ -182,7 +182,11 @@ export function caseRoutes(deps: AppDeps) {
         pageCount: documents.pageCount,
       })
       .from(documents)
-      .where(and(eq(documents.caseId, id), eq(documents.tenantId, tenantId)));
+      .where(and(eq(documents.caseId, id), eq(documents.tenantId, tenantId)))
+      // Same order as the progress stream. Unordered, the planner is free to
+      // return these differently between reads, which makes the document list
+      // visibly reshuffle while analysis is running.
+      .orderBy(documents.createdAt);
 
     return c.json(
       {

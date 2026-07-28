@@ -2,35 +2,42 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router";
 
 import { getCase } from "../../api/endpoints.js";
-import { queryKeys } from "../../api/queries.js";
+import { queryKeys, useAnalyzeCase } from "../../api/queries.js";
+import { Button } from "../../components/ui/button.js";
 import { Spinner } from "../../components/ui/spinner.js";
-import { DocumentList } from "./document-list.js";
+import { deriveCaseStage, isSettled } from "../../stream/derive-stage.js";
+import { useAutoAnalyze } from "../../stream/use-auto-analyze.js";
+import { useCaseProgress } from "../../stream/use-progress.js";
+import { ProgressPanel } from "../progress/progress-panel.js";
 
-/**
- * Refetch while anything is still moving. This is the fallback path the
- * streamed version keeps for when the event stream is unavailable, so it is
- * written to be correct on its own: the interval stops as soon as every
- * document is terminal, and every render is derived from persisted state.
- */
-const POLL_MS = 2_000;
+/** Only used once the stream has given up; see `useCaseProgress`. */
+const FALLBACK_POLL_MS = 3_000;
 
 export function CasePage() {
-  const { caseId } = useParams();
+  const { caseId = "" } = useParams();
 
   const { data, isPending, error } = useQuery({
-    queryKey: queryKeys.case(caseId ?? ""),
-    queryFn: ({ signal }) => getCase(caseId ?? "", { signal }),
-    enabled: caseId !== undefined,
+    queryKey: queryKeys.case(caseId),
+    queryFn: ({ signal }) => getCase(caseId, { signal }),
+    enabled: caseId !== "",
     refetchInterval: (query) => {
       const docs = query.state.data?.documents ?? [];
-      const settled =
-        docs.length > 0 &&
-        docs.every((d) => d.status === "failed" || d.analysisStatus !== "pending");
-      return settled ? false : POLL_MS;
+      return isSettled(deriveCaseStage(docs)) ? false : FALLBACK_POLL_MS;
     },
   });
 
-  if (caseId === undefined) return <Navigate to="/" replace />;
+  // The stream is opened only after a typed read succeeded, so a session
+  // failure has already surfaced as itself rather than as an opaque
+  // EventSource error.
+  const { progress, degraded } = useCaseProgress(caseId, data !== undefined);
+
+  const documents = data?.documents ?? [];
+  const stage = deriveCaseStage(progress?.documents ?? documents);
+  useAutoAnalyze(caseId, stage);
+
+  const analyze = useAnalyzeCase();
+
+  if (caseId === "") return <Navigate to="/" replace />;
 
   if (isPending) {
     return (
@@ -40,9 +47,6 @@ export function CasePage() {
     );
   }
 
-  // SessionError already threw to the route boundary; anything reaching here is
-  // a case this session cannot see, which the API reports as 404 rather than
-  // leaking that it exists.
   if (error || !data) {
     return (
       <div className="py-16 text-center">
@@ -56,18 +60,34 @@ export function CasePage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{data.title}</h1>
-      {/* Deliberately not `retentionDays`: that field is the Phase-4 per-case
-          setting and is not what governs an anonymous session. The tenant's
-          `exp` is 24 h and the retention job purges on the same number
-          (ADR-0011), so 24 h is the promise actually being kept. */}
-      <p className="mt-1 text-sm text-slate-500">
-        {data.documents.length} {data.documents.length === 1 ? "document" : "documents"} · deleted
-        automatically when this session ends, within 24 hours
-      </p>
+      <div className="flex items-start justify-between gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{data.title}</h1>
+          {/* Deliberately not `retentionDays`: that field is the Phase-4
+              per-case setting, while an anonymous tenant's `exp` and the
+              retention job both run on 24 h (ADR-0011). */}
+          <p className="mt-1 text-sm text-slate-500">
+            {documents.length} {documents.length === 1 ? "document" : "documents"} · deleted
+            automatically when this session ends, within 24 hours
+          </p>
+        </div>
+
+        {stage === "analyzed" && (
+          <Button
+            variant="secondary"
+            disabled={analyze.isPending}
+            onClick={() => {
+              analyze.mutate(caseId);
+            }}
+          >
+            {analyze.isPending && <Spinner />}
+            Re-run the analysis
+          </Button>
+        )}
+      </div>
 
       <div className="mt-8">
-        <DocumentList documents={data.documents} />
+        <ProgressPanel documents={documents} progress={progress} degraded={degraded} />
       </div>
     </div>
   );
