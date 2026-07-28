@@ -31,7 +31,7 @@ export interface ExtractionDeps {
 
 export interface ExtractionParams {
   documentId: string;
-  /** Defaults to the dev tenant; the eval/demo path passes the demo tenant. */
+  /** FR-7.4 scope; the eval/demo path passes the demo tenant. */
   tenantId: string;
 }
 

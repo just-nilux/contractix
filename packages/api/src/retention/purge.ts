@@ -20,7 +20,8 @@ import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { type Db } from "../db/client.js";
 import { documents, tenants } from "../db/schema/index.js";
 import { logger } from "../logger.js";
-import { extensionForMime, type LocalBlobStore } from "../storage/local.js";
+import { type LocalBlobStore } from "../storage/local.js";
+import { sweepUnreferencedBlobs } from "../storage/sweep.js";
 
 export interface PurgeDeps {
   db: Db;
@@ -55,17 +56,7 @@ export async function purgeExpiredTenants(
 
   await deps.db.delete(tenants).where(inArray(tenants.id, ids));
 
-  let blobs = 0;
-  for (const doc of candidates) {
-    const stillReferenced = await deps.db
-      .select({ id: documents.id })
-      .from(documents)
-      .where(eq(documents.sha256, doc.sha256))
-      .limit(1);
-    if (stillReferenced[0]) continue;
-    await deps.blobStore.remove(doc.sha256, extensionForMime(doc.mimeType));
-    blobs++;
-  }
+  const blobs = await sweepUnreferencedBlobs(deps.db, deps.blobStore, candidates);
 
   logger.info({ tenants: ids.length, blobs }, "expired anonymous sessions purged");
   return { tenants: ids.length, blobs };

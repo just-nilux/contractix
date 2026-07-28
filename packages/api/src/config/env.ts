@@ -46,6 +46,29 @@ const envSchema = z.object({
         .split(",")
         .map((o) => o.trim())
         .filter(Boolean),
+    )
+    // `*` with `credentials: true` is the combination that hands any site a
+    // visitor's session; browsers reject it, but a server that offers it has
+    // already decided to. Refuse at boot rather than emit a header no browser
+    // will honour and nobody will notice is broken.
+    .refine((origins) => !origins.includes("*"), {
+      message: "CORS_ORIGINS cannot be '*': sessions are credentialed, so origins must be explicit",
+    })
+    .refine(
+      (origins) =>
+        origins.every((o) => {
+          try {
+            const url = new URL(o);
+            return (
+              (url.protocol === "https:" || url.protocol === "http:") && o === url.origin // no path, query or trailing slash
+            );
+          } catch {
+            return false;
+          }
+        }),
+      {
+        message: "every CORS_ORIGINS entry must be a bare http(s) origin, e.g. https://app.example",
+      },
     ),
   JINA_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -59,8 +82,21 @@ export type Env = z.infer<typeof envSchema>;
 
 export const env: Env = envSchema.parse(process.env);
 
+/** Below this, brute-forcing an HS256 signing key is a realistic afternoon. */
+const MIN_PRODUCTION_SECRET_LENGTH = 32;
+
 // A production deploy signing sessions with the committed dev secret would let
-// anyone mint a cookie for any tenant. Fail at boot, not at the first request.
-if (env.NODE_ENV === "production" && env.SESSION_SECRET === DEV_SESSION_SECRET) {
-  throw new Error("SESSION_SECRET must be set in production (the dev default is public)");
+// anyone mint a cookie for any tenant. Fail at boot, not at the first request -
+// and reject a short secret too, since "not the default" is a low bar for the
+// one value standing between a visitor and every other visitor's documents.
+if (env.NODE_ENV === "production") {
+  if (env.SESSION_SECRET === DEV_SESSION_SECRET) {
+    throw new Error("SESSION_SECRET must be set in production (the dev default is public)");
+  }
+  if (env.SESSION_SECRET.length < MIN_PRODUCTION_SECRET_LENGTH) {
+    throw new Error(
+      `SESSION_SECRET must be at least ${MIN_PRODUCTION_SECRET_LENGTH} characters in production ` +
+        "(generate one: openssl rand -base64 32)",
+    );
+  }
 }

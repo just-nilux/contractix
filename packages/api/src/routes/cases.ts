@@ -5,7 +5,7 @@ import { type AppEnv, ensureTenant, requireTenant, tenantOf } from "../auth/midd
 import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { cases, documents } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
-import { extensionForMime } from "../storage/local.js";
+import { sweepUnreferencedBlobs } from "../storage/sweep.js";
 
 const caseSchema = z.object({
   id: z.uuid(),
@@ -171,17 +171,9 @@ export function caseRoutes(deps: AppDeps) {
       .returning({ id: cases.id });
     if (!deleted[0]) return c.body(null, 404);
 
-    // Rows are gone by now, so a blob still referenced belongs to a document
+    // Rows are gone by now, so anything still referenced belongs to a document
     // elsewhere - deduplication means the same bytes can back several cases.
-    for (const doc of docs) {
-      const stillReferenced = await deps.db
-        .select({ id: documents.id })
-        .from(documents)
-        .where(eq(documents.sha256, doc.sha256))
-        .limit(1);
-      if (stillReferenced[0]) continue;
-      await deps.blobStore.remove(doc.sha256, extensionForMime(doc.mimeType));
-    }
+    await sweepUnreferencedBlobs(deps.db, deps.blobStore, docs);
 
     return c.body(null, 204);
   });

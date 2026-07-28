@@ -31,7 +31,7 @@ export interface ClassifierDeps {
 
 export interface ClassifierParams {
   documentId: string;
-  /** Defaults to the dev tenant; the analysis job passes the document's tenant. */
+  /** FR-7.4 scope; the analysis job passes the document's tenant. */
   tenantId: string;
 }
 

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { v7 as uuidv7 } from "uuid";
 
 /**
@@ -30,6 +30,10 @@ export const tenants = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    // Enforced in the database, not only in TypeScript: the retention sweep and
+    // the demo-template lookup both branch on `kind`, so a value outside this
+    // set would make an anonymous session unpurgeable or a template invisible.
+    check("tenants_kind_check", sql`${t.kind} in ('anon', 'demo', 'user')`),
     index("tenants_expires_idx")
       .on(t.expiresAt)
       .where(sql`${t.expiresAt} is not null`),

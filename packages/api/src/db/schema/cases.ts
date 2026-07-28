@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 
@@ -23,6 +23,9 @@ export const cases = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    // The TS enum is compile-time only, and `demo/clone-case.ts` writes this
+    // column in raw SQL - a CHECK is what actually holds the domain.
+    check("cases_origin_check", sql`${t.origin} in ('upload', 'demo')`),
     // `POST /demo/adopt` is idempotent by a read-then-write check, which two
     // concurrent requests from the same session - a double-clicked button -
     // would both pass. This makes one demo clone per session structural

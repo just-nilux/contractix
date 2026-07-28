@@ -17,7 +17,7 @@ export interface AnalysisDeps {
 
 export interface AnalysisParams {
   documentId: string;
-  /** Defaults to the dev tenant; the analysis worker passes the document's tenant. */
+  /** FR-7.4 scope; the analysis worker passes the document's tenant. */
   tenantId: string;
 }
 

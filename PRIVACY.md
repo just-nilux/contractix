@@ -36,10 +36,9 @@ a trace (tool calls, retrieved clause ids, tokens, cost, latency). Questions are
 can contain personal context the documents do not, so they are treated as sensitive on the same
 footing as document text: tenant-scoped on read, and cascade-deleted with the case.
 
-Two consequences to close out with the Phase-4 retention work: `qa_turns` must be covered by the
-hard-delete job alongside files, chunks and embeddings, and the per-case `retention_days` applies
-to it. Until that job exists, deleting a case removes turns via `ON DELETE CASCADE`, but nothing
-expires them on a timer.
+Turns are covered by the same deletions as everything else: they cascade when a case is deleted,
+and they go with the tenant when the 24-hour purge sweeps an anonymous session. A per-case
+`retention_days` for signed-in accounts is Phase 4, along with accounts themselves.
 
 ## Prompt-injection posture (FR-7.5)
 

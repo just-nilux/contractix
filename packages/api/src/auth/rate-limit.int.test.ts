@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -29,7 +30,9 @@ describe("rate limiting (real redis)", () => {
   let redis: ReturnType<typeof createRedis>;
   let storageDir: string;
   const mintedTenants: string[] = [];
-  const ip = `10.0.0.${Math.floor(Date.now() % 250) + 1}`;
+  // Random, not time-derived: `Date.now() % 250` cycles every 250 ms, so two
+  // forks could share a bucket and see each other's 429s.
+  const ip = `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
 
   const createCase = (title: string) =>
     app.request("/cases", {

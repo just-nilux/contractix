@@ -102,8 +102,9 @@ const progressRoute = createRoute({
   request: { params: z.object({ id: z.uuid() }) },
   responses: {
     200: {
-      description: "SSE stream of progress snapshots",
-      content: { "application/json": { schema: progressSchema } },
+      description:
+        "SSE stream of progress snapshots; each `progress`/`done` event carries this body",
+      content: { "text/event-stream": { schema: progressSchema } },
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Not found" },
