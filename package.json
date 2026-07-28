@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run --project unit --passWithNoTests",
+    "test": "vitest run --project unit --project web --passWithNoTests",
     "test:int": "vitest run --project integration --passWithNoTests",
     "test:all": "vitest run --passWithNoTests",
     "compose:up": "docker compose up -d --wait",
