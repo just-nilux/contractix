@@ -10,11 +10,14 @@
  * Callers must delete their rows first: this asks what is left.
  *
  * Residual race, accepted deliberately: a document referencing one of these
- * hashes could be inserted between the query and the unlink. The window is
- * milliseconds, the store is content-addressed so re-uploading the same bytes
- * restores the file, and closing it properly means locking the documents table
- * for the duration of a filesystem walk. Recorded here rather than left for
- * someone to rediscover.
+ * hashes could be inserted between the query and the unlink. Closing it
+ * properly means holding a lock on the documents table for the duration of a
+ * filesystem walk, which is a worse trade than the failure it prevents —
+ * because the failure is bounded. The worst outcome is a row whose bytes are
+ * gone, and `GET /documents/:id/file` already checks the blob exists and 404s,
+ * so that reads as a missing file rather than a corrupt response; re-uploading
+ * the same bytes restores it, the store being content-addressed. Recorded here
+ * rather than left for someone to rediscover.
  */
 import { inArray } from "drizzle-orm";
 
@@ -35,22 +38,30 @@ export async function sweepUnreferencedBlobs(
 ): Promise<number> {
   if (candidates.length === 0) return 0;
 
-  const byHash = new Map(candidates.map((c) => [c.sha256, c]));
+  // Keyed by hash AND mime: `extensionForMime` puts the same bytes at
+  // `{sha}.pdf` or `{sha}.docx`, so collapsing on the hash alone would leave
+  // one of the two files behind forever.
+  const pending = new Map(candidates.map((c) => [`${c.sha256}:${c.mimeType}`, c]));
+  const hashes = [...new Set(candidates.map((c) => c.sha256))];
+
   // One query for every candidate, rather than one per hash.
   const stillReferenced = await db
     .selectDistinct({ sha256: documents.sha256 })
     .from(documents)
-    .where(inArray(documents.sha256, [...byHash.keys()]));
-  for (const row of stillReferenced) byHash.delete(row.sha256);
+    .where(inArray(documents.sha256, hashes));
+  const keep = new Set(stillReferenced.map((r) => r.sha256));
 
   let removed = 0;
-  for (const ref of byHash.values()) {
+  for (const ref of pending.values()) {
+    if (keep.has(ref.sha256)) continue;
     try {
       await blobStore.remove(ref.sha256, extensionForMime(ref.mimeType));
       removed++;
     } catch (err) {
       // A blob we cannot unlink is disk to reclaim later, not a failed delete:
-      // the rows are already gone, which is what the user asked for.
+      // the rows are already gone, which is what the caller asked for. It is
+      // not retried — a retry queue for a leaked file is machinery this does
+      // not earn at demo scale, and the leak is bounded by the upload ceiling.
       logger.warn({ err, sha256: ref.sha256 }, "could not remove unreferenced blob");
     }
   }
