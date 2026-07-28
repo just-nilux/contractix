@@ -15,12 +15,15 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
       <header className="border-b border-slate-200">
-        {/* Nav links arrive with the screens they point at; a header link that
-            resolves to "Nothing here" is the same broken promise as a stub route. */}
-        <div className="mx-auto flex max-w-6xl items-center px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Contractix
           </Link>
+          <nav className="text-sm">
+            <Link to="/cases" className="text-slate-600 hover:text-slate-900">
+              Your cases
+            </Link>
+          </nav>
         </div>
       </header>
 

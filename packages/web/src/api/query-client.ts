@@ -28,6 +28,11 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => failureCount < 2 && !isTerminalError(error),
+      // A session failure is never a per-screen concern: it throws to the route
+      // error boundary, which owns the no-session / expired distinction. Screens
+      // where a 401 is an *expected* answer - the landing page asking for cases
+      // before you have a session - opt out with `throwOnError: false`.
+      throwOnError: (error) => error instanceof SessionError,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     },

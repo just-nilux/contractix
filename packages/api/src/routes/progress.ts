@@ -21,7 +21,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
-import { type AnalysisPhase, progressSchema } from "@contractix/shared";
+import { type AnalysisPhase, derivePhase, progressSchema } from "@contractix/shared";
 
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { cases, documents } from "../db/schema/index.js";
@@ -40,22 +40,13 @@ interface DocRow {
   parseReport: { pages?: { page: number; status: string }[] } | null;
 }
 
-function phaseOf(row: DocRow): AnalysisPhase {
-  if (row.status === "failed" || row.analysisStatus === "failed") return "failed";
-  if (row.status === "uploaded") return "queued";
-  if (row.status === "processing") return "parsing";
-  if (row.analysisStatus === "analyzed") return "ready";
-  if (row.analysisStatus === "analyzing") return "analyzing";
-  return "queued";
-}
-
 const TERMINAL: readonly AnalysisPhase[] = ["ready", "failed"];
 
 function snapshot(caseId: string, rows: DocRow[]) {
   const docs = rows.map((row) => ({
     documentId: row.id,
     filename: row.filename,
-    phase: phaseOf(row),
+    phase: derivePhase(row),
     status: row.status,
     analysisStatus: row.analysisStatus,
     pageFailures: (row.parseReport?.pages ?? [])

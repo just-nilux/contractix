@@ -3,6 +3,8 @@ import { createBrowserRouter } from "react-router";
 import { AppShell } from "./components/app-shell.js";
 import { RouteErrorBoundary } from "./components/error-boundary.js";
 import { NotFound } from "./components/states/not-found.js";
+import { CaseListPage } from "./features/cases/case-list-page.js";
+import { CasePage } from "./features/cases/case-page.js";
 import { LandingPage } from "./features/landing/landing-page.js";
 
 /**
@@ -18,6 +20,8 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <LandingPage /> },
+      { path: "cases", element: <CaseListPage /> },
+      { path: "cases/:caseId", element: <CasePage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

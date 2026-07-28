@@ -277,6 +277,31 @@ export type LayoutPage = DocumentLayout["pages"][number];
 export const analysisPhaseSchema = z.enum(["queued", "parsing", "analyzing", "ready", "failed"]);
 export type AnalysisPhase = z.infer<typeof analysisPhaseSchema>;
 
+/**
+ * Collapses the two independent status columns into the one phase a reader
+ * cares about.
+ *
+ * Lives here because both sides need it and they must agree: the progress
+ * stream sends `phase` precomputed, but `GET /cases/{id}` returns only the raw
+ * columns, so the client derives the same value when it polls. Two copies of
+ * this would drift into a UI that disagrees with its own event stream.
+ *
+ * Note the last line: a document that finished ingesting but has not been
+ * analyzed reads as `queued`, not `ready` - `analyzed` only ever arrives after
+ * someone asks for analysis.
+ */
+export function derivePhase(doc: {
+  status: string;
+  analysisStatus: string;
+}): z.infer<typeof analysisPhaseSchema> {
+  if (doc.status === "failed" || doc.analysisStatus === "failed") return "failed";
+  if (doc.status === "uploaded") return "queued";
+  if (doc.status === "processing") return "parsing";
+  if (doc.analysisStatus === "analyzed") return "ready";
+  if (doc.analysisStatus === "analyzing") return "analyzing";
+  return "queued";
+}
+
 export const documentProgressSchema = z.object({
   documentId: z.uuid(),
   filename: z.string(),
