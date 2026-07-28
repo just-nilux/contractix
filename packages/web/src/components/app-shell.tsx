@@ -2,6 +2,7 @@ import { Link, Outlet } from "react-router";
 
 import { DISCLAIMER } from "@contractix/shared/schemas";
 
+import { CitationProvider } from "../citations/citation-context.js";
 import { DisclaimerGate } from "./disclaimer-gate.js";
 
 /**
@@ -32,9 +33,14 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
-        <Outlet />
-      </main>
+      {/* Citation chips appear in flags, terms, narrative sentences and search
+          hits, and all of them open the same viewer - so the target lives above
+          the routes rather than being threaded through each of them. */}
+      <CitationProvider>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+          <Outlet />
+        </main>
+      </CitationProvider>
 
       <footer className="border-t border-slate-200 bg-slate-50">
         <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-slate-500">{DISCLAIMER}</p>

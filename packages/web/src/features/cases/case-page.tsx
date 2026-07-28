@@ -9,6 +9,7 @@ import { deriveCaseStage, isSettled } from "../../stream/derive-stage.js";
 import { useAutoAnalyze } from "../../stream/use-auto-analyze.js";
 import { useCaseProgress } from "../../stream/use-progress.js";
 import { ProgressPanel } from "../progress/progress-panel.js";
+import { CaseReportView } from "../report/case-report.js";
 
 /** Only used once the stream has given up; see `useCaseProgress`. */
 const FALLBACK_POLL_MS = 3_000;
@@ -89,6 +90,11 @@ export function CasePage() {
       <div className="mt-8">
         <ProgressPanel documents={documents} progress={progress} degraded={degraded} />
       </div>
+
+      {/* Rendered as soon as anything has been analyzed, not only once the whole
+          case has: a two-document case should not hide the finished report
+          behind the slower document. */}
+      <CaseReportView caseId={caseId} enabled={stage === "analyzed" || stage === "analyzing"} />
     </div>
   );
 }
