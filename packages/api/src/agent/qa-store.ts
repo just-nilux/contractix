@@ -1,7 +1,9 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
+import { serializeClauseId } from "@contractix/shared";
+
 import { type Db } from "../db/client.js";
-import { citations, qaTurns } from "../db/schema/index.js";
+import { citations, clauses, qaTurns } from "../db/schema/index.js";
 import { type AskResult } from "./agent-service.js";
 import { type NarrativeResult } from "./report-writer.js";
 
@@ -187,7 +189,15 @@ export async function saveNarrativeTurn(
 export interface StoredNarrative {
   turnId: string;
   markdown: string;
-  citations: { clauseId: string; charStart: number; charEnd: number; documentId: string }[];
+  citations: {
+    clauseId: string;
+    /** The `[[...]]` marker the narrative text carries; the client joins on it. */
+    serializedClauseId: string;
+    page: number;
+    charStart: number;
+    charEnd: number;
+    documentId: string;
+  }[];
   couldNotVerify: string[];
   grounded: boolean;
   corrected: boolean;
@@ -218,20 +228,35 @@ export async function latestNarrative(
   const row = rows[0];
   if (!row) return null;
 
+  // Joined to `clauses` for the natural ref: the narrative's text cites clauses
+  // by their serialized id, so without it a reader's client cannot tie a
+  // `[[...]]` marker in the prose to the citation row that justifies it. The
+  // citations table stores the uuid, which is the identity; the serialized form
+  // is derived from it (ADR-0005) rather than duplicated into a column.
   const citationRows = await deps.db
     .select({
       clauseId: citations.clauseId,
+      clauseRef: clauses.clauseRef,
+      page: clauses.page,
       charStart: citations.charStart,
       charEnd: citations.charEnd,
       documentId: citations.documentId,
     })
     .from(citations)
+    .innerJoin(clauses, eq(clauses.id, citations.clauseId))
     .where(and(eq(citations.answerId, row.id), eq(citations.tenantId, params.tenantId)));
 
   return {
     turnId: row.id,
     markdown: row.answer,
-    citations: citationRows,
+    citations: citationRows.map((c) => ({
+      clauseId: c.clauseId,
+      serializedClauseId: serializeClauseId(c.documentId, c.clauseRef),
+      page: c.page,
+      charStart: c.charStart,
+      charEnd: c.charEnd,
+      documentId: c.documentId,
+    })),
     couldNotVerify: (row.couldNotVerify ?? []) as string[],
     grounded: row.grounded,
     corrected: row.corrected,

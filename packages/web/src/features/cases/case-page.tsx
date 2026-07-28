@@ -9,6 +9,7 @@ import { deriveCaseStage, isSettled } from "../../stream/derive-stage.js";
 import { useAutoAnalyze } from "../../stream/use-auto-analyze.js";
 import { useCaseProgress } from "../../stream/use-progress.js";
 import { ProgressPanel } from "../progress/progress-panel.js";
+import { NarrativePanel } from "../narrative/narrative-panel.js";
 import { CaseReportView } from "../report/case-report.js";
 import { CaseSearch } from "../search/case-search.js";
 
@@ -96,6 +97,10 @@ export function CasePage() {
           case has: a two-document case should not hide the finished report
           behind the slower document. */}
       <CaseReportView caseId={caseId} enabled={stage === "analyzed" || stage === "analyzing"} />
+
+      {/* The narrative is written over the structured report, so it only makes
+          sense once one exists. */}
+      {stage === "analyzed" && <NarrativePanel caseId={caseId} />}
 
       {/* Available as soon as the clauses exist, which is before analysis - and
           for a document classified as `other` it is the only citation entry

@@ -159,7 +159,9 @@ export function narrativeRoutes(deps: AppDeps) {
         disclaimer: DISCLAIMER,
         citations: result.citations.map((x) => ({
           clauseId: x.clauseId,
+          serializedClauseId: x.serializedClauseId,
           documentId: x.documentId,
+          page: x.page,
           charStart: x.charStart,
           charEnd: x.charEnd,
         })),

@@ -382,7 +382,14 @@ export type AskResponse = z.infer<typeof askResponseSchema>;
 
 export const narrativeCitationSchema = z.object({
   clauseId: z.uuid(),
+  /**
+   * The `[[...]]` marker the narrative's own prose carries. Present so a client
+   * can tie a marker in a sentence to the citation row that justifies it -
+   * without it, "every line cited" is a claim the reader cannot follow.
+   */
+  serializedClauseId: z.string(),
   documentId: z.uuid(),
+  page: z.number().int(),
   charStart: z.number().int(),
   charEnd: z.number().int(),
 });
