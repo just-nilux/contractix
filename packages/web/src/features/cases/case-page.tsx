@@ -10,6 +10,7 @@ import { useAutoAnalyze } from "../../stream/use-auto-analyze.js";
 import { useCaseProgress } from "../../stream/use-progress.js";
 import { ProgressPanel } from "../progress/progress-panel.js";
 import { CaseReportView } from "../report/case-report.js";
+import { CaseSearch } from "../search/case-search.js";
 
 /** Only used once the stream has given up; see `useCaseProgress`. */
 const FALLBACK_POLL_MS = 3_000;
@@ -95,6 +96,11 @@ export function CasePage() {
           case has: a two-document case should not hide the finished report
           behind the slower document. */}
       <CaseReportView caseId={caseId} enabled={stage === "analyzed" || stage === "analyzing"} />
+
+      {/* Available as soon as the clauses exist, which is before analysis - and
+          for a document classified as `other` it is the only citation entry
+          point there is. */}
+      {stage !== "ingesting" && stage !== "empty" && <CaseSearch caseId={caseId} />}
     </div>
   );
 }
