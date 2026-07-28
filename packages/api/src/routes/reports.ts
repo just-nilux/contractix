@@ -1,6 +1,8 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
+import { analyzeAcceptedSchema, caseAnalyzeAcceptedSchema } from "@contractix/shared";
+
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { cases, documents } from "../db/schema/index.js";
@@ -13,12 +15,6 @@ import {
   getDocumentReport,
 } from "../extraction/report-service.js";
 import { enqueueAnalysis } from "../queue/analysis.js";
-
-const analyzeAcceptedSchema = z.object({
-  documentId: z.uuid(),
-  analysisStatus: z.literal("analyzing"),
-});
-const caseAnalyzeAcceptedSchema = z.object({ caseId: z.uuid(), enqueued: z.number().int() });
 
 const getDocumentReportRoute = createRoute({
   method: "get",

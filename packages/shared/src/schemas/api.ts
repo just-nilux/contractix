@@ -14,6 +14,15 @@
  */
 import { z } from "zod";
 
+/**
+ * FR-7.6 - every surface that emits analysis says what it is. Lives here rather
+ * than in each route because the web renders the same sentence in its first-run
+ * gate, and a disclaimer that drifts between the modal and the report is worse
+ * than no disclaimer at all.
+ */
+export const DISCLAIMER =
+  "Informational analysis, not legal or tax advice. Statutory references are pointers, not determinations.";
+
 // --- citations, fields, flags -------------------------------------------------
 
 export const reportCitationSchema = z.object({
@@ -147,6 +156,86 @@ export const documentSchema = z.object({
 });
 export type ApiDocument = z.infer<typeof documentSchema>;
 
+/**
+ * `POST /cases/:id/documents`. The route splits this by status - 201 for stored
+ * bytes, 200 for a content-hash hit (FR-1.5) - but a client that only wants to
+ * know which document it now holds parses one shape for both.
+ */
+export const documentUploadSchema = z.object({
+  document: documentSchema,
+  deduplicated: z.boolean(),
+});
+export type DocumentUpload = z.infer<typeof documentUploadSchema>;
+
+export const analyzeAcceptedSchema = z.object({
+  documentId: z.uuid(),
+  analysisStatus: z.literal("analyzing"),
+});
+
+export const caseAnalyzeAcceptedSchema = z.object({
+  caseId: z.uuid(),
+  /** Only `ready` documents are enqueued, so a case with none is 202 with 0. */
+  enqueued: z.number().int(),
+});
+export type CaseAnalyzeAccepted = z.infer<typeof caseAnalyzeAcceptedSchema>;
+
+// --- clauses ------------------------------------------------------------------
+
+/**
+ * A clause with its structural citation fields. `charStart`/`charEnd` are
+ * absolute canonical offsets frozen at parse time (ADR-0005): the viewer
+ * resolves them to a page rectangle, and the clause-text panel slices `text` at
+ * them. Neither ever transforms the text - slicing is the only permitted
+ * operation downstream of the parser.
+ */
+export const clauseSchema = z.object({
+  id: z.uuid(),
+  documentId: z.uuid(),
+  clauseRef: z.string(),
+  serializedClauseId: z.string(),
+  clausePath: z.string(),
+  heading: z.string().nullable(),
+  headingPath: z.array(z.string()),
+  page: z.number().int(),
+  charStart: z.number().int(),
+  charEnd: z.number().int(),
+  seq: z.number().int(),
+  text: z.string(),
+});
+export type Clause = z.infer<typeof clauseSchema>;
+
+export const clauseContextSchema = z.object({
+  clause: clauseSchema,
+  before: z.array(clauseSchema),
+  after: z.array(clauseSchema),
+});
+export type ClauseContext = z.infer<typeof clauseContextSchema>;
+
+// --- search -------------------------------------------------------------------
+
+export const searchResultSchema = z.object({
+  clauseId: z.uuid(),
+  chunkId: z.uuid(),
+  documentId: z.uuid(),
+  clauseRef: z.string(),
+  serializedClauseId: z.string(),
+  clausePath: z.string(),
+  heading: z.string().nullable(),
+  headingPath: z.array(z.string()),
+  page: z.number().int(),
+  charStart: z.number().int(),
+  charEnd: z.number().int(),
+  snippet: z.string(),
+  scores: z.object({ fused: z.number(), rerank: z.number().nullable() }),
+});
+export type SearchResult = z.infer<typeof searchResultSchema>;
+
+export const searchResponseSchema = z.object({
+  query: z.string(),
+  results: z.array(searchResultSchema),
+});
+export type SearchResponse = z.infer<typeof searchResponseSchema>;
+
 // --- viewer geometry ----------------------------------------------------------
 
 /**
@@ -263,6 +352,31 @@ export const askResponseSchema = z.object({
   trace: z.unknown(),
 });
 export type AskResponse = z.infer<typeof askResponseSchema>;
+
+// --- narrative report (FR-5.3) ------------------------------------------------
+
+export const narrativeCitationSchema = z.object({
+  clauseId: z.uuid(),
+  documentId: z.uuid(),
+  charStart: z.number().int(),
+  charEnd: z.number().int(),
+});
+export type NarrativeCitation = z.infer<typeof narrativeCitationSchema>;
+
+export const narrativeSchema = z.object({
+  turnId: z.uuid(),
+  markdown: z.string(),
+  disclaimer: z.string(),
+  citations: z.array(narrativeCitationSchema),
+  /** Same contract as `ask`: surfaced, never silently dropped (FR-5.2). */
+  couldNotVerify: z.array(z.string()),
+  grounded: z.boolean(),
+  corrected: z.boolean(),
+  promptVersion: z.string(),
+  createdAt: z.iso.datetime(),
+  trace: z.unknown(),
+});
+export type Narrative = z.infer<typeof narrativeSchema>;
 
 // --- errors -------------------------------------------------------------------
 

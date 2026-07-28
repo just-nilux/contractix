@@ -1,3 +1,5 @@
+import { type AgentEvent } from "@contractix/shared";
+
 import { type Db } from "../db/client.js";
 import {
   type LlmContentBlock,
@@ -37,11 +39,12 @@ export interface AskParams {
   onEvent?: (event: AgentEvent) => void;
 }
 
-export type AgentEvent =
-  | { type: "token"; text: string }
-  | { type: "tool_call"; name: string; input: unknown }
-  | { type: "tool_result"; name: string; ok: boolean; clauseCount: number }
-  | { type: "retry"; reason: string };
+/**
+ * Declared as Zod in `@contractix/shared` so the emitter and the web parse the
+ * same object - a variant cannot be added here without the client being able to
+ * read it. Re-exported because this is still where the events originate.
+ */
+export type { AgentEvent };
 
 export interface TraceStep {
   turn: number;

@@ -23,7 +23,7 @@
  */
 import { and, eq, inArray } from "drizzle-orm";
 
-import { serializeClauseId } from "@contractix/shared";
+import { type NarrativeEvent, serializeClauseId } from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
 import { clauses } from "../db/schema/index.js";
@@ -52,15 +52,14 @@ import {
 const MAX_TOKENS = 16_384;
 const MAX_CORRECTIONS = 1;
 
-export type NarrativeEvent =
-  | { type: "token"; text: string }
-  | { type: "retry"; reason: string }
-  /**
-   * Unlike `ask`, the corrective regeneration IS streamed - a multi-paragraph
-   * report would otherwise leave the reader staring at a frozen screen. This
-   * tells the client to clear what it has and start again.
-   */
-  | { type: "restart" };
+/**
+ * Declared as Zod in `@contractix/shared` (see `schemas/events.ts`) so the
+ * writer and the web share one definition. Note `restart`: unlike `ask`, the
+ * corrective regeneration IS streamed - a multi-paragraph report would
+ * otherwise leave the reader staring at a frozen screen - so the client is told
+ * to clear what it has rather than being left with two concatenated drafts.
+ */
+export type { NarrativeEvent };
 
 export interface NarrativeDeps {
   db: Db;

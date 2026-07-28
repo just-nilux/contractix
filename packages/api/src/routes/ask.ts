@@ -2,19 +2,15 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
-import { askResponseSchema, costEur } from "@contractix/shared";
+import { type AgentEvent, askResponseSchema, costEur, DISCLAIMER } from "@contractix/shared";
 
-import { type AgentEvent, askCase } from "../agent/agent-service.js";
+import { askCase } from "../agent/agent-service.js";
 import { saveQaTurn } from "../agent/qa-store.js";
 import { cases } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { logger } from "../logger.js";
-
-/** FR-7.6 — an answer says what it is, like every report does. */
-const DISCLAIMER =
-  "Informational analysis, not legal or tax advice. Statutory references are pointers, not determinations.";
 
 const askRequestSchema = z.object({
   question: z.string().min(1).max(2_000),

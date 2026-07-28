@@ -6,5 +6,6 @@
 export * from "./api.js";
 export * from "./blocks.js";
 export * from "./documents.js";
+export * from "./events.js";
 export * from "./ids.js";
 export * from "./extraction/index.js";

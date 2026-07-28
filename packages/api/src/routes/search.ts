@@ -1,26 +1,12 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 
+import { searchResponseSchema } from "@contractix/shared";
+
 import { cases } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import { searchClauses } from "../retrieval/search-service.js";
-
-const searchResultSchema = z.object({
-  clauseId: z.uuid(),
-  chunkId: z.uuid(),
-  documentId: z.uuid(),
-  clauseRef: z.string(),
-  serializedClauseId: z.string(),
-  clausePath: z.string(),
-  heading: z.string().nullable(),
-  headingPath: z.array(z.string()),
-  page: z.number().int(),
-  charStart: z.number().int(),
-  charEnd: z.number().int(),
-  snippet: z.string(),
-  scores: z.object({ fused: z.number(), rerank: z.number().nullable() }),
-});
 
 const searchRoute = createRoute({
   method: "get",
@@ -41,11 +27,7 @@ const searchRoute = createRoute({
   responses: {
     200: {
       description: "Ranked clause citations",
-      content: {
-        "application/json": {
-          schema: z.object({ query: z.string(), results: z.array(searchResultSchema) }),
-        },
-      },
+      content: { "application/json": { schema: searchResponseSchema } },
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Case not found" },

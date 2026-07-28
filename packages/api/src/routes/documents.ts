@@ -1,4 +1,4 @@
-import { documentSchema } from "@contractix/shared";
+import { documentSchema, documentUploadSchema } from "@contractix/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, count, eq } from "drizzle-orm";
 
@@ -40,7 +40,7 @@ const uploadDocument = (deps: AppDeps) =>
         description: "Document stored and queued for ingestion",
         content: {
           "application/json": {
-            schema: z.object({ document: documentSchema, deduplicated: z.literal(false) }),
+            schema: documentUploadSchema.extend({ deduplicated: z.literal(false) }),
           },
         },
       },
@@ -48,7 +48,7 @@ const uploadDocument = (deps: AppDeps) =>
         description: "Identical bytes already exist in this case",
         content: {
           "application/json": {
-            schema: z.object({ document: documentSchema, deduplicated: z.literal(true) }),
+            schema: documentUploadSchema.extend({ deduplicated: z.literal(true) }),
           },
         },
       },

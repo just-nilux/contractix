@@ -1,6 +1,7 @@
 import {
   type CaseReport,
   caseReportSchema,
+  DISCLAIMER,
   type DocumentReport,
   documentExtractionSchema,
   documentReportSchema,
@@ -29,10 +30,6 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { type Db } from "../db/client.js";
 import { cases, citations, clauses, documents, extractions, flags } from "../db/schema/index.js";
-
-/** FR-7.6 — every report says what it is (and is not). */
-const DISCLAIMER =
-  "Informational analysis, not legal or tax advice. Statutory references are pointers, not determinations.";
 
 const SEVERITY_ORDER = { red: 0, amber: 1, info: 2 } as const;
 type Severity = keyof typeof SEVERITY_ORDER;

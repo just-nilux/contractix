@@ -12,39 +12,15 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
-import { costEur } from "@contractix/shared";
+import { costEur, DISCLAIMER, type NarrativeEvent, narrativeSchema } from "@contractix/shared";
 
 import { latestNarrative, saveNarrativeTurn } from "../agent/qa-store.js";
-import { type NarrativeEvent, writeNarrativeReport } from "../agent/report-writer.js";
+import { writeNarrativeReport } from "../agent/report-writer.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { cases } from "../db/schema/index.js";
 import { type AppDeps } from "../deps.js";
 import { logger } from "../logger.js";
-
-/** FR-7.6 — a narrative says what it is, like every other surface. */
-const DISCLAIMER =
-  "Informational analysis, not legal or tax advice. Statutory references are pointers, not determinations.";
-
-const narrativeCitationSchema = z.object({
-  clauseId: z.uuid(),
-  documentId: z.uuid(),
-  charStart: z.number().int(),
-  charEnd: z.number().int(),
-});
-
-const narrativeSchema = z.object({
-  turnId: z.uuid(),
-  markdown: z.string(),
-  disclaimer: z.string(),
-  citations: z.array(narrativeCitationSchema),
-  couldNotVerify: z.array(z.string()),
-  grounded: z.boolean(),
-  corrected: z.boolean(),
-  promptVersion: z.string(),
-  createdAt: z.iso.datetime(),
-  trace: z.unknown(),
-});
 
 const getNarrative = createRoute({
   method: "get",
