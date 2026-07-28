@@ -27,3 +27,8 @@ coverage/
 
 # eval artifacts: results are per-run, history/cache/baselines are committed
 packages/eval/results/
+
+# playwright artifacts
+playwright-report/
+test-results/
+blob-report/
