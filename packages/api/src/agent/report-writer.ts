@@ -43,7 +43,13 @@ import {
   type ReportInputDocument,
 } from "./report-prompt.js";
 
-const MAX_TOKENS = 4_096;
+/**
+ * Generous because `models.yaml` pins the agent role to `effort: high`, and on
+ * an adaptive-thinking model this cap covers thinking *and* response text
+ * together. A four-section report over a few dozen clauses at 4k produced
+ * exactly zero characters: the entire budget went to reasoning.
+ */
+const MAX_TOKENS = 16_384;
 const MAX_CORRECTIONS = 1;
 
 export type NarrativeEvent =
@@ -259,6 +265,20 @@ async function runGeneration(
       .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
       .map((b) => b.text)
       .join("");
+
+    // An empty or truncated report must never read as success. `validateGrounding`
+    // says an empty string is fine - it contains no uncited assertion - which is
+    // true and useless: a report that ends mid-sentence can also end mid-citation.
+    // Retrying buys nothing, since the same budget truncates the same way.
+    if (markdown.trim().length === 0) {
+      throw new Error(
+        `narrative generation produced no text (stopReason: ${res.stopReason}); ` +
+          "the token budget is likely exhausted by reasoning",
+      );
+    }
+    if (res.stopReason === "max_tokens") {
+      throw new Error("narrative generation hit the token ceiling and would be truncated");
+    }
 
     grounding = validateGrounding(markdown, citable);
     if (grounding.ok || attempt > MAX_CORRECTIONS) break;

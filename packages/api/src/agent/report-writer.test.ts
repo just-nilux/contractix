@@ -212,6 +212,35 @@ describe("generateNarrative", () => {
     expect(result.markdown).toContain("Empty case");
   });
 
+  /**
+   * The live run that motivated this: Sonnet 5 at `effort: high` spent an
+   * entire 4k budget on reasoning and returned no text, which the validator
+   * happily called grounded — an empty report that looks like a success is
+   * worse than an error.
+   */
+  it("fails loudly on empty output rather than reporting it as grounded", async () => {
+    await expect(run([""])).rejects.toThrow(/produced no text/);
+  });
+
+  it("fails on a truncated report rather than citing half a sentence", async () => {
+    class TruncatingLlm extends ScriptedLlm {
+      override converse(opts: LlmConverseOptions): Promise<LlmConverseResult> {
+        void super.converse(opts);
+        return Promise.resolve({
+          stopReason: "max_tokens",
+          content: [{ type: "text", text: "## Summary\n\nProbation runs eight mon" }],
+          usage: { inputTokens: 10, outputTokens: 20 },
+        });
+      }
+    }
+    await expect(
+      generateNarrative(
+        { agentLlm: new TruncatingLlm([""]) },
+        { caseTitle: "t", documents: DOCUMENTS, citable: CITABLE, forPrompt: FOR_PROMPT },
+      ),
+    ).rejects.toThrow(/token ceiling/);
+  });
+
   it("passes the citable clause text and ids into the prompt", async () => {
     const llm = new ScriptedLlm([`Probation. [[${MARKER}]]`]);
     await generateNarrative(

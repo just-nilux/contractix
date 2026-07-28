@@ -43,6 +43,8 @@ Concrete, specific asks the reader could make, each tied to a clause. Phrase the
 ## Open questions
 What the documents do not settle. A term recorded as not found is a legitimate open question — say so plainly rather than guessing at it.
 
+Note that a sentence about what the documents do NOT say still asserts something about them, so it still needs a marker: cite the clause you looked at, or end the sentence with [[caveat]] if there is no clause to point to. This section is where reports most often lose a whole regeneration to a missing marker.
+
 # Style
 
 Do NOT reproduce the terms table. The reader already has every extracted field rendered beside this text; repeating them wastes their attention. Refer to a term when it carries an argument, and otherwise let the table speak.
