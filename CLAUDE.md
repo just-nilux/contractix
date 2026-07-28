@@ -16,6 +16,7 @@ pnpm demo:extract          # extract + benchmark demo docs → data/demo-red-fla
 pnpm eval:retrieval        # recall@8 / MRR over gold Q&A
 pnpm eval:extraction       # extraction field accuracy / not_found precision / citation recall (real: ANTHROPIC_API_KEY + EVAL_ALLOW_LIVE_PROVIDERS)
 pnpm eval:rules            # red-flag precision/recall/F1 vs gold flags (deterministic, keyless; --gate / --write-baseline)
+pnpm test:e2e              # playwright smoke over the running stack (starts `pnpm dev` itself; needs a seeded demo corpus)
 ```
 
 ## Conventions
@@ -44,5 +45,13 @@ pnpm eval:rules            # red-flag precision/recall/F1 vs gold flags (determi
   the signed session cookie (`tenantOf(c)`), never a path param, header, or body field; the
   demo corpus is **cloned** into a visitor's own tenant rather than shared read-only, so the
   guard below stays a single equality check; and rate limiting fails **open** on a Redis error.
+- Read ADR-0012 before touching the web data layer, its streams, or citation highlighting: the
+  client `.parse()`s responses with the **API's own Zod objects** from `@contractix/shared/schemas`
+  (anything the web must parse belongs there, never retyped); `EventSource` serves the GET stream
+  while the two POST streams use `fetch` + the hand-rolled framer; completion is derived from
+  phases, **never from `done` alone** (an ingested-but-unanalyzed case never emits it); and
+  highlight rectangles are exact only where a citation covers whole blocks — partial coverage is
+  interpolated, labelled `exact: false`, and always shown beside the exact clause-text panel.
+  `verbatimAnchor` is display-only and must never be used to locate anything.
 - `tenant_id` guard in every chunk/clause/extraction/flag/citation/qa_turn query — denormalized
   precisely so no join is needed. Never widen it to set membership.

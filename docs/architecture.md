@@ -13,5 +13,7 @@ shaped the implementation are recorded as ADRs:
 - [ADR-0008](adr/0008-classification-and-chained-analysis.md) — document classification & chained analysis job
 - [ADR-0009](adr/0009-whitespace-invariant-anchor-resolution.md) — whitespace-invariant anchor resolution (refines ADR-0007)
 - [ADR-0010](adr/0010-agent-loop-and-grounding-contract.md) — agent loop, grounding contract & the citable set
+- [ADR-0011](adr/0011-anonymous-sessions-and-demo-adoption.md) — anonymous sessions, tenant scope & demo adoption
+- [ADR-0012](adr/0012-web-data-layer-and-client-side-citation-highlighting.md) — web data layer, streaming conventions & client-side citation highlighting
 
 A rendered architecture diagram is a planned addition to the README.
