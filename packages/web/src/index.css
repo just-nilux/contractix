@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+/**
+ * Tailwind v4 has no config file - tokens are CSS variables in `@theme`.
+ *
+ * Only tokens the product actually needs are declared here. Severity is the one
+ * genuinely domain-specific scale: a red flag, an amber flag and an info flag
+ * are the spine of the report, and each needs a text/surface/border triple so a
+ * flag card reads at a glance rather than carrying its severity in prose alone.
+ * Everything else uses Tailwind's stock scales.
+ */
+@theme {
+  /* Red: unenforceable, costly, or materially against the reader (FR-4). */
+  --color-severity-red: oklch(0.52 0.21 25);
+  --color-severity-red-surface: oklch(0.97 0.02 25);
+  --color-severity-red-border: oklch(0.86 0.09 25);
+
+  /* Amber: non-standard, worth negotiating, not disqualifying. */
+  --color-severity-amber: oklch(0.52 0.13 65);
+  --color-severity-amber-surface: oklch(0.97 0.035 85);
+  --color-severity-amber-border: oklch(0.85 0.1 80);
+
+  /* Info: mechanical consequences worth showing the math for. */
+  --color-severity-info: oklch(0.52 0.13 250);
+  --color-severity-info-surface: oklch(0.97 0.02 250);
+  --color-severity-info-border: oklch(0.86 0.06 250);
+
+  /* The cited span in the document viewer; alpha applied at the use site. */
+  --color-citation: oklch(0.83 0.16 95);
+}

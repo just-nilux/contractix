@@ -1,3 +1,5 @@
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -51,6 +53,14 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // Only the web renders React. typescript-eslint catches none of the
+    // rules-of-hooks class of bug, and the streaming hooks — which own an
+    // AbortController and bail early on an aborted signal — are exactly where an
+    // early return before a hook would hide.
+    files: ["packages/web/**/*.{ts,tsx}"],
+    extends: [reactHooks.configs.flat["recommended-latest"], jsxA11y.flatConfigs.recommended],
   },
   {
     files: ["**/*.{js,mjs,cjs}"],

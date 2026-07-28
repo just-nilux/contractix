@@ -32,6 +32,8 @@
     "@types/node": "catalog:",
     "docx": "^9.7.1",
     "eslint": "catalog:",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "playwright": "^1.61.1",
     "prettier": "catalog:",
     "tsx": "catalog:",

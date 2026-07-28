@@ -1,0 +1,36 @@
+import { Link, Outlet } from "react-router";
+
+import { DISCLAIMER } from "@contractix/shared/schemas";
+
+/**
+ * Header, routed content, and the persistent half of FR-7.6.
+ *
+ * The disclaimer band renders the same `DISCLAIMER` string the API returns on
+ * every report, answer and narrative, imported from the shared schemas rather
+ * than retyped here - a disclaimer that drifts between the chrome and the
+ * output is worse than one that only appears once. The blocking first-run gate
+ * is the other half and mounts above `Outlet`.
+ */
+export function AppShell() {
+  return (
+    <div className="flex min-h-screen flex-col bg-white text-slate-900">
+      <header className="border-b border-slate-200">
+        {/* Nav links arrive with the screens they point at; a header link that
+            resolves to "Nothing here" is the same broken promise as a stub route. */}
+        <div className="mx-auto flex max-w-6xl items-center px-6 py-4">
+          <Link to="/" className="text-lg font-semibold tracking-tight">
+            Contractix
+          </Link>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+        <Outlet />
+      </main>
+
+      <footer className="border-t border-slate-200 bg-slate-50">
+        <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-slate-500">{DISCLAIMER}</p>
+      </footer>
+    </div>
+  );
+}
