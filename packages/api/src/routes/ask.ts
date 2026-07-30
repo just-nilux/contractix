@@ -11,6 +11,7 @@ import {
 } from "@contractix/shared";
 
 import { askCase } from "../agent/agent-service.js";
+import { loadConversation } from "../agent/history.js";
 import { saveQaTurn } from "../agent/qa-store.js";
 import { cases } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
@@ -65,6 +66,12 @@ export function askRoutes(deps: AppDeps) {
 
     const wantsJson = c.req.header("accept")?.includes("application/json") ?? false;
 
+    // Read here, not sent by the client: a request that could assert what the
+    // assistant previously said would be steering the model through text it
+    // never wrote. Loaded once, outside `run`, so the corrective regeneration
+    // sees the same conversation as the first attempt.
+    const history = await loadConversation(deps.db, { caseId, tenantId });
+
     const run = async (onEvent?: (event: AgentEvent) => void) => {
       const result = await askCase(
         {
@@ -73,7 +80,7 @@ export function askRoutes(deps: AppDeps) {
           reranker: deps.providers.reranker,
           agentLlm: deps.providers.agentLlm,
         },
-        { caseId, tenantId, question, ...(onEvent ? { onEvent } : {}) },
+        { caseId, tenantId, question, history, ...(onEvent ? { onEvent } : {}) },
       );
 
       const eur = costEur(deps.models.llm, "model", result.usage);

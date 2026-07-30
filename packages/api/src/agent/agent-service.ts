@@ -21,6 +21,7 @@ import {
   type GroundingResult,
   validateGrounding,
 } from "./grounding.js";
+import { type PriorTurn, toHistoryMessages } from "./history.js";
 import { SYSTEM_PROMPT } from "./prompt.js";
 import { AGENT_TOOLS, type AgentTool, type ToolContext } from "./tools/index.js";
 
@@ -42,6 +43,13 @@ export interface AskParams {
   caseId: string;
   tenantId: string;
   question: string;
+  /**
+   * Prior exchanges, oldest first — the route loads them with
+   * `loadConversation`. Passed in rather than fetched here so the loop stays
+   * testable without a database, and explicit so a caller that wants a
+   * one-shot question (an eval, a future MCP tool) simply omits them.
+   */
+  history?: readonly PriorTurn[];
   onEvent?: (event: AgentEvent) => void;
 }
 
@@ -139,7 +147,11 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
     jsonSchema: t.jsonSchema,
   }));
 
+  // Prior exchanges first, as plain text with their markers stripped: the
+  // citable set is rebuilt from *this* request's tool output (ADR-0010 point 4),
+  // so an old clause id in front of the model would only get cited and rejected.
   const messages: LlmMessage[] = [
+    ...toHistoryMessages(params.history ?? []),
     { role: "user", content: [{ type: "text", text: params.question }] },
   ];
   // Accumulated across the whole request, including the CRAG retry: a clause

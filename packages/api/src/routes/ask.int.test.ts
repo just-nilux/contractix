@@ -22,7 +22,13 @@ import { cases, citations, clauses, qaTurns, tenants } from "../db/schema/index.
 import { type AppDeps } from "../deps.js";
 import { buildPdf } from "../ingestion/parser/__fixtures__/pdf.js";
 import { runIngestion } from "../ingestion/pipeline.js";
-import { FakeEmbeddings, FakeLlm, PassthroughReranker } from "../providers/index.js";
+import {
+  FakeEmbeddings,
+  FakeLlm,
+  type LlmConverseOptions,
+  type LlmConverseResult,
+  PassthroughReranker,
+} from "../providers/index.js";
 import { type AnalysisQueue, createAnalysisQueue } from "../queue/analysis.js";
 import { createRedis } from "../queue/connection.js";
 import { createIngestQueue, type IngestQueue } from "../queue/ingest.js";
@@ -45,8 +51,34 @@ const OFFER = buildPdf([
  */
 type AskBody = AskResponse;
 
+/**
+ * `FakeLlm` plus a record of what it was last asked. The conversation history
+ * is loaded server-side and never appears in a request or a response, so the
+ * messages the provider was handed are the only place it is observable.
+ */
+class RecordingLlm extends FakeLlm {
+  readonly seen: LlmConverseOptions[] = [];
+
+  /** Call between requests: assertions are about the *first* turn of one request. */
+  reset(): void {
+    this.seen.length = 0;
+  }
+
+  /** What the loop opened the request with, before any tool result was appended. */
+  get openingMessages(): LlmConverseOptions["messages"] {
+    return this.seen[0]?.messages ?? [];
+  }
+
+  override converse(opts: LlmConverseOptions): Promise<LlmConverseResult> {
+    // Snapshot: the loop mutates one array in place as it appends tool results.
+    this.seen.push({ ...opts, messages: structuredClone(opts.messages) });
+    return super.converse(opts);
+  }
+}
+
 describe("ask route (integration)", () => {
   let deps: AppDeps;
+  let llm: RecordingLlm;
   let ingestQueue: IngestQueue;
   let analysisQueue: AnalysisQueue;
   let redis: ReturnType<typeof createRedis>;
@@ -72,7 +104,7 @@ describe("ask route (integration)", () => {
         embeddings: new FakeEmbeddings(1024),
         reranker: new PassthroughReranker(),
         llm: new FakeLlm(),
-        agentLlm: new FakeLlm(),
+        agentLlm: (llm = new RecordingLlm()),
       },
       models: loadModelsConfig(),
       maxUploadBytes: 25 * 1024 * 1024,
@@ -229,5 +261,80 @@ describe("ask route (integration)", () => {
     const caseId = await seededCase();
     const res = await ask(caseId, "");
     expect(res.status).toBe(400);
+  });
+
+  /**
+   * The follow-up is the whole point: "und die Kündigungsfrist?" means nothing
+   * without the question before it. History is read from `qa_turns` rather than
+   * sent by the client, so this is the only place the wiring is observable.
+   */
+  it("carries the earlier exchange into a follow-up question", async () => {
+    const caseId = await seededCase();
+    await ask(caseId, "Wie lang ist die Probezeit?");
+
+    llm.reset();
+    const res = await ask(caseId, "Und die Kündigungsfrist?");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AskBody;
+
+    // Both turns persisted against the same case, in order.
+    const turns = await db
+      .select({ question: qaTurns.question, answer: qaTurns.answer })
+      .from(qaTurns)
+      .where(and(eq(qaTurns.caseId, caseId), eq(qaTurns.kind, "ask")))
+      .orderBy(qaTurns.createdAt);
+    expect(turns.map((t) => t.question)).toEqual([
+      "Wie lang ist die Probezeit?",
+      "Und die Kündigungsfrist?",
+    ]);
+
+    // What the model was actually opened with for the second question.
+    const sent = llm.openingMessages;
+    expect(sent.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(sent[0]?.content[0]).toMatchObject({ text: "Wie lang ist die Probezeit?" });
+    expect(sent[2]?.content[0]).toMatchObject({ text: "Und die Kündigungsfrist?" });
+
+    // The replayed answer keeps its prose and loses its clause ids: they were
+    // citable in the previous request, not this one (ADR-0010 point 4).
+    const replayed = JSON.stringify(sent.slice(0, 2));
+    expect(replayed).not.toContain("[[");
+    // ...and the new answer still cites, from this request's own tool output.
+    expect(body.citations.length).toBeGreaterThan(0);
+    expect(body.grounded).toBe(true);
+  });
+
+  it("does not replay a narrative report as something the reader said", async () => {
+    const caseId = await seededCase();
+    await db.insert(qaTurns).values({
+      tenantId,
+      caseId,
+      kind: "report",
+      question: "narrative",
+      answer: "## Summary\n\nA whole report that nobody asked as a question.",
+      promptVersion: "report@1",
+      traceJson: {
+        model: "fake:llm",
+        stopReason: "stub",
+        citableClauseIds: [],
+        promptVersion: "report@1",
+        corrections: [],
+        inputFields: 0,
+        inputFlags: 0,
+        stubbed: true,
+      },
+      grounded: true,
+      corrected: false,
+      inputTokens: 0,
+      outputTokens: 0,
+      costEur: "0",
+      latencyMs: 1,
+    });
+
+    llm.reset();
+    await ask(caseId, "Wie lang ist die Probezeit?");
+
+    const sent = llm.openingMessages;
+    expect(sent.map((m) => m.role)).toEqual(["user"]);
+    expect(JSON.stringify(sent)).not.toContain("A whole report");
   });
 });

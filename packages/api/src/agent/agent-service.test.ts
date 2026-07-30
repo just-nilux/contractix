@@ -171,6 +171,50 @@ describe("askCase", () => {
     ]);
   });
 
+  /**
+   * Without this the transcript is a lie: the UI shows a conversation while
+   * every question is answered in isolation.
+   */
+  it("replays prior exchanges ahead of the question", async () => {
+    const llm = new ScriptedLlm([callSearch(), answer(`Zwei Wochen [[${CLAUSE_ID}]].`)]);
+    await askCase(deps(llm), {
+      caseId: "case-1",
+      tenantId: "tenant-1",
+      question: "Und die Kündigungsfrist?",
+      history: [
+        { question: "Wie lang ist die Probezeit?", answer: `Sechs Monate. [[${CLAUSE_ID}]]` },
+      ],
+    });
+
+    const sent = llm.seen[0]!.messages;
+    expect(sent.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(sent[0]?.content[0]).toMatchObject({ text: "Wie lang ist die Probezeit?" });
+    // Stripped: an id from an earlier request is not citable in this one.
+    expect(sent[1]?.content[0]).toMatchObject({ text: "Sechs Monate." });
+    expect(sent[2]?.content[0]).toMatchObject({ text: "Und die Kündigungsfrist?" });
+  });
+
+  it("puts no earlier clause id in front of the model", async () => {
+    const llm = new ScriptedLlm([callSearch(), answer(`Zwei Wochen [[${CLAUSE_ID}]].`)]);
+    await askCase(deps(llm), {
+      caseId: "case-1",
+      tenantId: "tenant-1",
+      question: "Und die Kündigungsfrist?",
+      history: [{ question: "q", answer: `Sechs Monate. [[${CLAUSE_ID}]]` }],
+    });
+
+    const replayed = JSON.stringify(llm.seen[0]!.messages.slice(0, 2));
+    expect(replayed).not.toContain("[[");
+    expect(replayed).not.toContain(CLAUSE_ID);
+  });
+
+  it("sends the question alone when there is no history", async () => {
+    const llm = new ScriptedLlm([callSearch(), answer(`Sechs Monate [[${CLAUSE_ID}]].`)]);
+    await ask(llm);
+
+    expect(llm.seen[0]!.messages.map((m) => m.role)).toEqual(["user"]);
+  });
+
   it("returns every tool result for one turn in a single user message", async () => {
     const twoCalls: LlmConverseResult = {
       stopReason: "tool_use",
