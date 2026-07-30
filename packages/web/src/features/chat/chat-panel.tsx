@@ -1,11 +1,11 @@
-import { ASK_QUESTION_MAX_CHARS, type AskResponse, DISCLAIMER } from "@contractix/shared/schemas";
+import { ASK_QUESTION_MAX_CHARS, DISCLAIMER } from "@contractix/shared/schemas";
 import { type FormEvent, useId, useState } from "react";
 
 import { RateLimitedNotice } from "../../components/states/rate-limited.js";
 import { Button } from "../../components/ui/button.js";
 import { useAskStream } from "../../stream/use-ask-stream.js";
 import { ChatTurn } from "./chat-turn.js";
-import { TraceDrawer } from "./trace-drawer.js";
+import { TraceDrawer, type TracedResult } from "./trace-drawer.js";
 
 /**
  * German and English, because the demo corpus is both and the first thing a
@@ -28,7 +28,7 @@ const EXAMPLES = [
 export function ChatPanel({ caseId }: { caseId: string }) {
   const inputId = useId();
   const [draft, setDraft] = useState("");
-  const [traceFor, setTraceFor] = useState<AskResponse | null>(null);
+  const [traceFor, setTraceFor] = useState<TracedResult | null>(null);
   const stream = useAskStream(caseId);
 
   const submit = (question: string) => {

@@ -5,7 +5,12 @@ import path from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { type AskResponse, loadModelsConfig, parseClauseId } from "@contractix/shared";
+import {
+  type AskResponse,
+  type CaseTurns,
+  loadModelsConfig,
+  parseClauseId,
+} from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
@@ -301,6 +306,60 @@ describe("ask route (integration)", () => {
     // ...and the new answer still cites, from this request's own tool output.
     expect(body.citations.length).toBeGreaterThan(0);
     expect(body.grounded).toBe(true);
+  });
+
+  /**
+   * The transcript endpoint exists so the screen and the model agree about what
+   * was said. Its citations join is the reason it took a slice of its own:
+   * without it every replayed marker matches nothing and `MarkdownView`
+   * correctly paints the whole conversation "unresolved".
+   */
+  it("replays the transcript with the citations that justify each answer", async () => {
+    const caseId = await seededCase();
+    await ask(caseId, "Wie lang ist die Probezeit?");
+    await ask(caseId, "Und die Kündigungsfrist?");
+
+    const res = await app.request(`/cases/${caseId}/turns`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CaseTurns;
+
+    // Oldest first, so a reader scrolls a conversation rather than a stack.
+    expect(body.turns.map((t) => t.question)).toEqual([
+      "Wie lang ist die Probezeit?",
+      "Und die Kündigungsfrist?",
+    ]);
+
+    for (const turn of body.turns) {
+      expect(turn.citations.length).toBeGreaterThan(0);
+      for (const citation of turn.citations) {
+        // Every marker in the replayed prose resolves to a citation row.
+        expect(turn.answer).toContain(`[[${citation.serializedClauseId}]]`);
+        expect(() => parseClauseId(citation.serializedClauseId)).not.toThrow();
+      }
+      expect(turn.trace?.steps.map((s) => s.tool)).toContain("search_clauses");
+      expect(turn.disclaimer).toContain("not legal or tax advice");
+    }
+  });
+
+  it("returns an empty transcript for a case nobody has asked about", async () => {
+    const caseId = await seededCase();
+    const res = await app.request(`/cases/${caseId}/turns`);
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as CaseTurns).turns).toEqual([]);
+  });
+
+  it("404s another session's transcript", async () => {
+    const [other] = await db
+      .insert(tenants)
+      .values({ name: `turns-other-${Date.now()}`, kind: "user" })
+      .returning();
+    const [foreign] = await db
+      .insert(cases)
+      .values({ tenantId: other!.id, title: "not yours" })
+      .returning();
+
+    expect((await app.request(`/cases/${foreign!.id}/turns`)).status).toBe(404);
   });
 
   it("does not replay a narrative report as something the reader said", async () => {

@@ -6,13 +6,14 @@ import {
   type AgentEvent,
   askRequestSchema,
   askResponseSchema,
+  caseTurnsSchema,
   costEur,
   DISCLAIMER,
 } from "@contractix/shared";
 
 import { askCase } from "../agent/agent-service.js";
 import { loadConversation } from "../agent/history.js";
-import { saveQaTurn } from "../agent/qa-store.js";
+import { listQaTurns, saveQaTurn } from "../agent/qa-store.js";
 import { cases } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
@@ -49,8 +50,47 @@ const askRoute = (deps: AppDeps) =>
     },
   });
 
+const turnsRoute = (deps: AppDeps) =>
+  createRoute({
+    method: "get",
+    path: "/cases/{id}/turns",
+    summary: "The case's Q&A transcript",
+    description:
+      "Every question asked of this case and the answer it got, oldest first, each with the " +
+      "citations that justify it — the same body the `ask` stream's terminal `done` event " +
+      "carries, plus `createdAt`.\n\n" +
+      "This is what the agent itself remembers: a follow-up question is answered with these " +
+      "exchanges in context, so the transcript and the model's memory are the same thing.\n\n" +
+      "`trace` may be null for a turn written by an older deploy.",
+    middleware: [rateLimit(deps, "read"), requireTenant] as const,
+    request: { params: z.object({ id: z.uuid() }) },
+    responses: {
+      200: {
+        description: "The transcript, oldest first",
+        content: { "application/json": { schema: caseTurnsSchema } },
+      },
+      401: { description: "No session, or the session expired" },
+      404: { description: "Case not found" },
+      ...RATE_LIMITED_RESPONSE,
+    },
+  });
+
 export function askRoutes(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>();
+
+  app.openapi(turnsRoute(deps), async (c) => {
+    const { id: caseId } = c.req.valid("param");
+    const tenantId = tenantOf(c);
+
+    const owned = await deps.db
+      .select({ id: cases.id })
+      .from(cases)
+      .where(and(eq(cases.id, caseId), eq(cases.tenantId, tenantId)))
+      .limit(1);
+    if (!owned[0]) return c.body(null, 404);
+
+    return c.json({ turns: await listQaTurns(deps, { caseId, tenantId }) }, 200);
+  });
 
   app.openapi(askRoute(deps), async (c) => {
     const { id: caseId } = c.req.valid("param");

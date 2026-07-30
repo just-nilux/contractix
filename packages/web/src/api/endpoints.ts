@@ -12,6 +12,7 @@ import {
   caseListSchema,
   caseReportSchema,
   caseSchema,
+  caseTurnsSchema,
   caseWithDocumentsSchema,
   clauseContextSchema,
   clauseSchema,
@@ -140,6 +141,20 @@ export function searchCase(
     schema: searchResponseSchema,
     ...sig(opts),
   });
+}
+
+// --- chat ---------------------------------------------------------------------
+
+/**
+ * The transcript. Read once when the panel mounts; the `ask` stream owns the
+ * cache entry from then on.
+ *
+ * This is also what the agent remembers — the server replays these same
+ * exchanges into a follow-up question — so fetching it is what keeps the visible
+ * conversation and the model's memory the same thing.
+ */
+export function getCaseTurns(caseId: string, opts?: Opts) {
+  return request(`/cases/${caseId}/turns`, { schema: caseTurnsSchema, ...sig(opts) });
 }
 
 // --- narrative ----------------------------------------------------------------
