@@ -19,6 +19,14 @@ export const queryKeys = {
   documentReport: (documentId: string) => ["document", documentId, "report"] as const,
   documentLayout: (documentId: string) => ["document", documentId, "layout"] as const,
   clause: (clauseId: string) => ["clause", clauseId] as const,
+  /**
+   * The chat transcript. There is no `GET /cases/{id}/turns` yet, so nothing
+   * fetches this key - the stream writes it with `setQueryData`. Living in the
+   * cache rather than in component state is what lets the conversation survive
+   * navigating away and back, and when a history endpoint does land it becomes
+   * a `queryFn` here with the panel untouched.
+   */
+  turns: (caseId: string) => ["case", caseId, "turns"] as const,
 };
 
 export function useDemoCatalog() {

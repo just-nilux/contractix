@@ -2,7 +2,13 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
-import { type AgentEvent, askResponseSchema, costEur, DISCLAIMER } from "@contractix/shared";
+import {
+  type AgentEvent,
+  askRequestSchema,
+  askResponseSchema,
+  costEur,
+  DISCLAIMER,
+} from "@contractix/shared";
 
 import { askCase } from "../agent/agent-service.js";
 import { saveQaTurn } from "../agent/qa-store.js";
@@ -11,10 +17,6 @@ import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { logger } from "../logger.js";
-
-const askRequestSchema = z.object({
-  question: z.string().min(1).max(2_000),
-});
 
 const askRoute = (deps: AppDeps) =>
   createRoute({

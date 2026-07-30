@@ -343,6 +343,17 @@ export const demoAdoptSchema = z.object({
 
 // --- Q&A ----------------------------------------------------------------------
 
+/**
+ * The ceiling on a question, shared so the composer can stop at exactly the
+ * length the route rejects. Kept here rather than in the route file because a
+ * client that has to guess it will guess wrong and turn a typo into a 400.
+ */
+export const ASK_QUESTION_MAX_CHARS = 2_000;
+
+export const askRequestSchema = z.object({
+  question: z.string().min(1).max(ASK_QUESTION_MAX_CHARS),
+});
+
 export const answerCitationSchema = z.object({
   clauseId: z.uuid(),
   serializedClauseId: z.string(),
