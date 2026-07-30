@@ -172,6 +172,19 @@ test("a visitor can analyze the demo corpus and click through to a cited clause"
   await trace.getByRole("button", { name: "Close" }).click();
   await expect(trace).toBeHidden();
 
+  // --- the transcript survives a reload, and the agent remembers it -------------
+  // The bug this pins: the panel rendered a conversation while every question
+  // was answered in isolation. Both halves are asserted — the turn is replayed
+  // from the server, and its markers still resolve (the citations join), which
+  // is what stops a replayed answer rendering entirely as "unresolved".
+  await page.reload();
+
+  const replayed = page.locator("section").filter({ hasText: "Ask a question" }).first();
+  await expect(replayed.getByText("Probezeit", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(replayed.getByText("Nothing asked yet.")).toBeHidden();
+  await expect(replayed.getByText("unresolved")).toHaveCount(0);
+  await expect(replayed.getByRole("button", { name: "Show the trace" }).first()).toBeVisible();
+
   // --- hard delete (PRD §9 flow 4) ---------------------------------------------
   await page.goto("/cases");
   await page.getByRole("button", { name: "Delete" }).first().click();
