@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { getNarrative } from "../../api/endpoints.js";
 import { NotFoundError } from "../../api/errors.js";
 import { queryKeys } from "../../api/queries.js";
+import { CouldNotVerify } from "../../citations/could-not-verify.js";
+import { MarkdownView } from "../../citations/markdown-view.js";
 import { RateLimitedNotice } from "../../components/states/rate-limited.js";
 import { Button } from "../../components/ui/button.js";
 import { Spinner } from "../../components/ui/spinner.js";
 import { useNarrativeStream } from "../../stream/use-narrative-stream.js";
-import { MarkdownView } from "./markdown-view.js";
 
 /**
  * FR-5.3's narrative report.
@@ -27,6 +28,13 @@ export function NarrativePanel({ caseId }: { caseId: string }) {
   const stream = useNarrativeStream(caseId);
 
   const notGenerated = stored.error instanceof NotFoundError;
+  /**
+   * Anything else the GET failed with - most usefully a `ResponseShapeError`,
+   * which is how ADR-0012 says a server schema change announces itself. Without
+   * this branch it announced itself as an empty section with a lone button,
+   * which is the opposite of loud.
+   */
+  const storedError = stored.error !== null && !notGenerated ? stored.error : null;
   const narrative = stream.result ?? stored.data ?? null;
   const markdown = stream.status === "idle" ? (narrative?.markdown ?? "") : stream.markdown;
   const citations = narrative?.citations ?? [];
@@ -82,6 +90,12 @@ export function NarrativePanel({ caseId }: { caseId: string }) {
         </p>
       )}
 
+      {storedError !== null && stream.status === "idle" && (
+        <p className="mt-4 rounded border border-severity-red-border bg-severity-red-surface px-3 py-2 text-sm text-severity-red">
+          An existing report could not be loaded: {storedError.message}
+        </p>
+      )}
+
       {stream.status === "error" && stream.error !== null && (
         <p className="mt-4 rounded border border-severity-red-border bg-severity-red-surface px-3 py-2 text-sm text-severity-red">
           {stream.error}
@@ -99,20 +113,7 @@ export function NarrativePanel({ caseId }: { caseId: string }) {
         </div>
       )}
 
-      {/* FR-5.2: surfaced, never quietly dropped. An unverifiable claim the
-          reader can see is safer than one silently removed. */}
-      {couldNotVerify.length > 0 && !stream.running && (
-        <div className="mt-4 rounded-lg border border-severity-amber-border bg-severity-amber-surface p-4">
-          <h3 className="text-sm font-medium text-severity-amber">
-            Claims that could not be tied to a clause
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-            {couldNotVerify.map((claim) => (
-              <li key={claim}>{claim}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {!stream.running && <CouldNotVerify claims={couldNotVerify} />}
 
       {narrative && !stream.running && (
         <p className="mt-3 text-xs text-slate-500">{narrative.disclaimer}</p>
