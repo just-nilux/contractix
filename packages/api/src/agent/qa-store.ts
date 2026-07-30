@@ -1,9 +1,10 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
-import { serializeClauseId } from "@contractix/shared";
+import { type NarrativeTrace, narrativeTraceSchema, serializeClauseId } from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
 import { citations, clauses, qaTurns } from "../db/schema/index.js";
+import { logger } from "../logger.js";
 import { type AskResult } from "./agent-service.js";
 import { type NarrativeResult } from "./report-writer.js";
 
@@ -93,7 +94,14 @@ export interface QaTurnSummary {
   trace: unknown;
 }
 
-/** Recent turns for a case, newest first — the chat history the UI replays. */
+/**
+ * Recent turns for a case, newest first.
+ *
+ * Unused: there is no `GET /cases/{id}/turns`, and the chat transcript is
+ * session-local (ADR-0013 decision 6). Kept because it is most of that endpoint
+ * already — what it still needs is the citations join, without which a replayed
+ * answer renders every `[[...]]` marker as "unresolved".
+ */
 export async function listQaTurns(
   deps: QaStoreDeps,
   params: { caseId: string; tenantId: string; limit?: number },
@@ -203,7 +211,22 @@ export interface StoredNarrative {
   corrected: boolean;
   promptVersion: string;
   createdAt: Date;
-  trace: unknown;
+  trace: NarrativeTrace | null;
+}
+
+/**
+ * `trace_json` is jsonb written by whichever deploy generated the row, so it is
+ * the one field here that can legitimately be of an older shape. Parsed rather
+ * than cast: a stale trace degrades to `null` and gets logged, and the report it
+ * belongs to is still served. Refusing a working narrative over its debug
+ * payload would be the wrong trade.
+ */
+function parseStoredTrace(turnId: string, raw: unknown): NarrativeTrace | null {
+  if (raw == null) return null;
+  const parsed = narrativeTraceSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  logger.warn({ turnId, issues: parsed.error.issues }, "stored narrative trace is not readable");
+  return null;
 }
 
 /** The latest narrative for a case, if one has been generated. */
@@ -262,6 +285,6 @@ export async function latestNarrative(
     corrected: row.corrected,
     promptVersion: row.promptVersion,
     createdAt: row.createdAt,
-    trace: row.traceJson,
+    trace: parseStoredTrace(row.id, row.traceJson),
   };
 }

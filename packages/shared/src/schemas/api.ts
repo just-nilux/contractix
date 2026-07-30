@@ -14,6 +14,8 @@
  */
 import { z } from "zod";
 
+import { agentTraceSchema, narrativeTraceSchema } from "./trace.js";
+
 /**
  * FR-7.6 - every surface that emits analysis says what it is. Lives here rather
  * than in each route because the web renders the same sentence in its first-run
@@ -341,6 +343,17 @@ export const demoAdoptSchema = z.object({
 
 // --- Q&A ----------------------------------------------------------------------
 
+/**
+ * The ceiling on a question, shared so the composer can stop at exactly the
+ * length the route rejects. Kept here rather than in the route file because a
+ * client that has to guess it will guess wrong and turn a typo into a 400.
+ */
+export const ASK_QUESTION_MAX_CHARS = 2_000;
+
+export const askRequestSchema = z.object({
+  question: z.string().min(1).max(ASK_QUESTION_MAX_CHARS),
+});
+
 export const answerCitationSchema = z.object({
   clauseId: z.uuid(),
   serializedClauseId: z.string(),
@@ -374,7 +387,7 @@ export const askResponseSchema = z.object({
   grounded: z.boolean(),
   corrected: z.boolean(),
   usage: usageSchema,
-  trace: z.unknown(),
+  trace: agentTraceSchema,
 });
 export type AskResponse = z.infer<typeof askResponseSchema>;
 
@@ -406,7 +419,13 @@ export const narrativeSchema = z.object({
   corrected: z.boolean(),
   promptVersion: z.string(),
   createdAt: z.iso.datetime(),
-  trace: z.unknown(),
+  /**
+   * Nullable because this one is served from storage: `GET .../narrative`
+   * replays a row that an older deploy may have written in an older shape. A
+   * legacy row's markdown and citations are still perfectly good, so the trace
+   * degrades to `null` rather than taking a working report down with it.
+   */
+  trace: narrativeTraceSchema.nullable(),
 });
 export type Narrative = z.infer<typeof narrativeSchema>;
 

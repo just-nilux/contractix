@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { narrativeTraceSchema } from "@contractix/shared";
+
 import {
   type LlmConverseOptions,
   type LlmConverseResult,
@@ -210,6 +212,25 @@ describe("generateNarrative", () => {
     expect(result.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
     expect(result.markdown).toContain("## Summary");
     expect(result.markdown).toContain("Empty case");
+    // The stub is a whole second construction site for this object, and it is
+    // the one keyless CI exercises — so it has to satisfy the same contract.
+    expect(narrativeTraceSchema.safeParse(result.trace).success).toBe(true);
+  });
+
+  /**
+   * `narrativeSchema.trace` is what `GET .../narrative` publishes and what the
+   * web parses, so a value this writer emits but that schema rejects would only
+   * surface as a `ResponseShapeError` in a browser.
+   */
+  it("emits a trace the published schema accepts", async () => {
+    const result = await run([`## Summary\n\nProbation runs eight months. [[${MARKER}]]`]);
+
+    const parsed = narrativeTraceSchema.safeParse(result.trace);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(parsed.success).toBe(true);
+    // Serialized, matching the agent loop. This used to be the row uuid, which
+    // meant one published field named two different things depending on path.
+    expect(result.trace.citableClauseIds).toEqual([MARKER]);
   });
 
   /**

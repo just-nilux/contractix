@@ -5,7 +5,7 @@ import path from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { loadModelsConfig, parseClauseId } from "@contractix/shared";
+import { type AskResponse, loadModelsConfig, parseClauseId } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
@@ -38,22 +38,12 @@ const OFFER = buildPdf([
   ],
 ]);
 
-interface AskBody {
-  turnId: string;
-  answer: string;
-  disclaimer: string;
-  citations: {
-    clauseId: string;
-    serializedClauseId: string;
-    charStart: number;
-    charEnd: number;
-    verbatimAnchor: string;
-  }[];
-  couldNotVerify: string[];
-  grounded: boolean;
-  usage: { inputTokens: number; outputTokens: number; costEur: number; latencyMs: number };
-  trace: { turns: number; steps: { tool: string }[]; stopReason: string };
-}
+/**
+ * The published response type rather than a local restatement of it. This file
+ * used to declare its own narrower copy, which meant the assertions below could
+ * keep passing while the shape the route actually promises drifted away.
+ */
+type AskBody = AskResponse;
 
 describe("ask route (integration)", () => {
   let deps: AppDeps;

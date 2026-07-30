@@ -1,4 +1,10 @@
-import { type AgentEvent } from "@contractix/shared";
+import {
+  type AgentCorrection,
+  type AgentEvent,
+  type AgentTrace,
+  type TraceClauseRef,
+  type TraceStep,
+} from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
 import {
@@ -46,14 +52,14 @@ export interface AskParams {
  */
 export type { AgentEvent };
 
-export interface TraceStep {
-  turn: number;
-  tool: string;
-  input: unknown;
-  ok: boolean;
-  clauseCount: number;
-  durationMs: number;
-}
+/**
+ * Same arrangement for the trace: `agentTraceSchema` is the published contract
+ * (it is `askResponseSchema.trace`), and these are its `z.infer`s, re-exported
+ * because this is where the trace originates. Declaring them here as interfaces
+ * instead would let the emitter drift from the shape the API promises without
+ * anything failing to compile.
+ */
+export type { AgentCorrection, AgentTrace, TraceStep };
 
 export interface AskResult {
   answer: string;
@@ -64,22 +70,7 @@ export interface AskResult {
   corrected: boolean;
   usage: TokenUsage;
   latencyMs: number;
-  trace: {
-    model: string;
-    turns: number;
-    steps: TraceStep[];
-    citableClauseIds: string[];
-    /** Why the corrective regeneration fired — empty when the first answer held. */
-    corrections: CorrectionRecord[];
-    stopReason: string;
-  };
-}
-
-/** What the validator rejected, kept for the trace drawer and for prompt tuning. */
-export interface CorrectionRecord {
-  turn: number;
-  uncited: string[];
-  unresolvedMarkers: string[];
+  trace: AgentTrace;
 }
 
 function textOf(blocks: LlmContentBlock[]): string {
@@ -98,6 +89,22 @@ function toCitable(clause: ClauseView): CitableClause {
     charStart: clause.charStart,
     charEnd: clause.charEnd,
     text: clause.text,
+  };
+}
+
+/**
+ * The same clause, minus its text, for the trace. Free: these are already in
+ * hand from the tool outcome, so recording which step surfaced what costs a
+ * `.map()` and no extra query.
+ */
+function toTraceRef(clause: ClauseView): TraceClauseRef {
+  return {
+    clauseId: clause.id,
+    serializedClauseId: clause.serializedClauseId,
+    documentId: clause.documentId,
+    clauseRef: clause.clauseRef,
+    page: clause.page,
+    heading: clause.heading,
   };
 }
 
@@ -139,7 +146,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
   // stays citable once a tool has surfaced it.
   const citable = new Map<string, CitableClause>();
   const steps: TraceStep[] = [];
-  const corrections: CorrectionRecord[] = [];
+  const corrections: AgentCorrection[] = [];
   const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
   let turns = 0;
@@ -195,6 +202,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
             ok: false,
             clauseCount: 0,
             durationMs: Date.now() - at,
+            clauses: [],
           });
           continue;
         }
@@ -227,6 +235,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
           ok,
           clauseCount: outcome.clauses?.length ?? 0,
           durationMs: Date.now() - at,
+          clauses: (outcome.clauses ?? []).map(toTraceRef),
         });
         params.onEvent?.({
           type: "tool_result",

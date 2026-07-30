@@ -53,5 +53,12 @@ pnpm test:e2e              # playwright smoke over the running stack (starts `pn
   highlight rectangles are exact only where a citation covers whole blocks — partial coverage is
   interpolated, labelled `exact: false`, and always shown beside the exact clause-text panel.
   `verbatimAnchor` is display-only and must never be used to locate anything.
+- Read ADR-0013 before touching the trace, the chat panel, or `qa_turns.trace_json`: the trace is
+  a **published schema** (`schemas/trace.ts`), so adding a field to it is an API change, not a
+  debug tweak; `citableClauseIds` is serialized ids on **both** paths; a step records _which_
+  clauses it surfaced, never their text; `narrativeSchema.trace` is nullable because that one is
+  replayed from storage, and `latestNarrative` parses rather than casts it. On the client, `ask`
+  has **no `restart`** — the corrective turn is not streamed, so `retry` keeps the draft and
+  `done` replaces it.
 - `tenant_id` guard in every chunk/clause/extraction/flag/citation/qa_turn query — denormalized
   precisely so no join is needed. Never widen it to set membership.

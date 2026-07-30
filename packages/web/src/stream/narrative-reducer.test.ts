@@ -17,7 +17,16 @@ const DONE: Narrative = {
   corrected: true,
   promptVersion: "1",
   createdAt: "2026-07-28T10:00:00.000Z",
-  trace: {},
+  trace: {
+    model: "claude-sonnet-5",
+    stopReason: "end_turn",
+    citableClauseIds: [],
+    promptVersion: "1",
+    corrections: [{ attempt: 1, uncited: ["One unverifiable claim."], unresolvedMarkers: [] }],
+    inputFields: 12,
+    inputFlags: 3,
+    stubbed: false,
+  },
 };
 
 function run(events: NarrativeStreamEvent[]): NarrativeState {

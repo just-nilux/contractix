@@ -8,4 +8,5 @@ export * from "./blocks.js";
 export * from "./documents.js";
 export * from "./events.js";
 export * from "./ids.js";
+export * from "./trace.js";
 export * from "./extraction/index.js";

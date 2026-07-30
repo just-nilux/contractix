@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { searchCase } from "../../api/endpoints.js";
-import { useCitations } from "../../citations/citation-context.js";
+import { ClauseLink } from "../../citations/clause-link.js";
 import { Button } from "../../components/ui/button.js";
 import { Spinner } from "../../components/ui/spinner.js";
 
@@ -21,7 +21,6 @@ export function CaseSearch({ caseId }: { caseId: string }) {
   const inputId = useId();
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
-  const { open } = useCitations();
 
   const { data, isFetching } = useQuery({
     queryKey: ["case", caseId, "search", query],
@@ -77,17 +76,14 @@ export function CaseSearch({ caseId }: { caseId: string }) {
           )}
           {data.results.map((hit) => (
             <li key={hit.chunkId}>
-              <button
-                type="button"
-                onClick={() => {
-                  open({
-                    documentId: hit.documentId,
-                    clauseId: hit.clauseId,
-                    page: hit.page,
-                    charStart: hit.charStart,
-                    charEnd: hit.charEnd,
-                    verbatimAnchor: null,
-                  });
+              <ClauseLink
+                target={{
+                  documentId: hit.documentId,
+                  clauseId: hit.clauseId,
+                  page: hit.page,
+                  charStart: hit.charStart,
+                  charEnd: hit.charEnd,
+                  verbatimAnchor: null,
                 }}
                 className="w-full rounded-lg border border-slate-200 px-4 py-3 text-left hover:border-slate-400 hover:bg-slate-50"
               >
@@ -102,7 +98,7 @@ export function CaseSearch({ caseId }: { caseId: string }) {
                 <span className="mt-1 block line-clamp-2 text-sm text-slate-600">
                   {hit.snippet}
                 </span>
-              </button>
+              </ClauseLink>
             </li>
           ))}
         </ul>

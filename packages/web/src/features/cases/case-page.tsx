@@ -8,6 +8,7 @@ import { Spinner } from "../../components/ui/spinner.js";
 import { deriveCaseStage, isSettled } from "../../stream/derive-stage.js";
 import { useAutoAnalyze } from "../../stream/use-auto-analyze.js";
 import { useCaseProgress } from "../../stream/use-progress.js";
+import { ChatPanel } from "../chat/chat-panel.js";
 import { ProgressPanel } from "../progress/progress-panel.js";
 import { NarrativePanel } from "../narrative/narrative-panel.js";
 import { CaseReportView } from "../report/case-report.js";
@@ -101,6 +102,13 @@ export function CasePage() {
       {/* The narrative is written over the structured report, so it only makes
           sense once one exists. */}
       {stage === "analyzed" && <NarrativePanel caseId={caseId} />}
+
+      {/* Gated with search rather than with the narrative: the agent's
+          retrieval tools work over clauses, which exist before analysis, and
+          FR-1.2 makes Q&A the only analysis a document classified `other` ever
+          gets. Hiding this behind `analyzed` would hide it exactly where it is
+          the only thing on the page. */}
+      {stage !== "ingesting" && stage !== "empty" && <ChatPanel caseId={caseId} />}
 
       {/* Available as soon as the clauses exist, which is before analysis - and
           for a document classified as `other` it is the only citation entry

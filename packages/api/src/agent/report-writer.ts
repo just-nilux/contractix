@@ -23,7 +23,12 @@
  */
 import { and, eq, inArray } from "drizzle-orm";
 
-import { type NarrativeEvent, serializeClauseId } from "@contractix/shared";
+import {
+  type NarrativeCorrection,
+  type NarrativeEvent,
+  type NarrativeTrace,
+  serializeClauseId,
+} from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
 import { clauses } from "../db/schema/index.js";
@@ -61,6 +66,14 @@ const MAX_CORRECTIONS = 1;
  */
 export type { NarrativeEvent };
 
+/**
+ * Likewise the trace: `narrativeTraceSchema` is `narrativeSchema.trace`, and
+ * this is its `z.infer`. Distinct from the agent's because a one-shot
+ * generation has no turns and calls no tools - it records what it was fed
+ * instead.
+ */
+export type { NarrativeCorrection, NarrativeTrace };
+
 export interface NarrativeDeps {
   db: Db;
   agentLlm: LlmProvider;
@@ -83,17 +96,7 @@ export interface NarrativeResult {
   usage: TokenUsage;
   latencyMs: number;
   promptVersion: string;
-  trace: {
-    model: string;
-    promptVersion: string;
-    citableClauseIds: string[];
-    corrections: { attempt: number; uncited: string[]; unresolvedMarkers: string[] }[];
-    stopReason: string;
-    inputFields: number;
-    inputFlags: number;
-    /** True when keyless mode short-circuited: no model call was made. */
-    stubbed: boolean;
-  };
+  trace: NarrativeTrace;
 }
 
 /** Deterministic stand-in when there is nothing citable - see `writeNarrativeReport`. */
@@ -236,7 +239,7 @@ async function runGeneration(
   startedAt: number,
 ): Promise<NarrativeResult> {
   const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
-  const corrections: NarrativeResult["trace"]["corrections"] = [];
+  const corrections: NarrativeCorrection[] = [];
   let markdown = "";
   let grounding = validateGrounding("", []);
   let stopReason = "end_turn";
@@ -309,7 +312,11 @@ async function runGeneration(
     trace: {
       model: deps.agentLlm.id,
       promptVersion: REPORT_PROMPT_VERSION,
-      citableClauseIds: citable.map((c) => c.clauseId),
+      // Serialized, not the row uuid: this is the set a `[[...]]` marker was
+      // allowed to name, and the agent loop's trace has always recorded it in
+      // that form. Two fields with one name meaning two things is worse than a
+      // one-line fix, so this reads the same on both paths from here on.
+      citableClauseIds: citable.map((c) => c.serializedClauseId),
       corrections,
       stopReason,
       inputFields,

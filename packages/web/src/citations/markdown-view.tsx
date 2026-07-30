@@ -1,10 +1,10 @@
-import { type NarrativeCitation } from "@contractix/shared/schemas";
 import { type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { useCitations } from "../../citations/citation-context.js";
-import { splitMarkers } from "../../citations/markers.js";
+import { ClauseLink } from "./clause-link.js";
+import { splitMarkers } from "./markers.js";
+import { type MarkerCitation, toCitationTarget } from "./types.js";
 
 const KIND_LABEL = {
   statute: "statute",
@@ -21,7 +21,7 @@ const KIND_LABEL = {
  */
 function withMarkers(
   children: ReactNode,
-  citations: readonly NarrativeCitation[],
+  citations: readonly MarkerCitation[],
   citationsKnown: boolean,
 ): ReactNode {
   if (typeof children === "string") return renderText(children, citations, citationsKnown);
@@ -39,7 +39,7 @@ function withMarkers(
 
 function renderText(
   text: string,
-  citations: readonly NarrativeCitation[],
+  citations: readonly MarkerCitation[],
   citationsKnown: boolean,
 ): ReactNode {
   const parts = splitMarkers(
@@ -76,11 +76,9 @@ function ClauseChip({
   citationsKnown,
 }: {
   value: string;
-  citation: NarrativeCitation | undefined;
+  citation: MarkerCitation | undefined;
   citationsKnown: boolean;
 }) {
-  const { open } = useCitations();
-
   if (!citation) {
     // Mid-stream the citation list does not exist yet - it arrives with `done` -
     // so a marker being unmatched says nothing at all. Flagging it as unresolved
@@ -110,23 +108,13 @@ function ClauseChip({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        open({
-          documentId: citation.documentId,
-          clauseId: citation.clauseId,
-          page: citation.page,
-          charStart: citation.charStart,
-          charEnd: citation.charEnd,
-          verbatimAnchor: null,
-        });
-      }}
+    <ClauseLink
+      target={toCitationTarget(citation)}
       title={value}
-      className="mx-0.5 rounded border border-slate-300 bg-slate-50 px-1 py-0.5 align-baseline text-[0.7rem] text-slate-600 hover:border-slate-400 hover:bg-slate-100"
+      className="mx-0.5 px-1 py-0.5 align-baseline text-[0.7rem]"
     >
       p{citation.page}
-    </button>
+    </ClauseLink>
   );
 }
 
@@ -136,7 +124,7 @@ export function MarkdownView({
   citationsKnown,
 }: {
   markdown: string;
-  citations: readonly NarrativeCitation[];
+  citations: readonly MarkerCitation[];
   /** False while streaming: the citation list only arrives with `done`. */
   citationsKnown: boolean;
 }) {
