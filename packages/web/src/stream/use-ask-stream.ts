@@ -108,8 +108,15 @@ export function useAskStream(caseId: string): AskStream {
             });
           }
         } finally {
-          if (abortRef.current === controller) abortRef.current = null;
-          setRunning(false);
+          // Both guarded by controller identity, not just the ref: Stop clears
+          // `abortRef` synchronously, so a second question can start before
+          // this task unwinds. An unguarded `setRunning(false)` would then
+          // report the *newer* stream as finished — hiding its Stop button and
+          // re-enabling Ask on a request still in flight.
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+            setRunning(false);
+          }
         }
       })();
     },

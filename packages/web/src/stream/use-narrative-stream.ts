@@ -82,8 +82,14 @@ export function useNarrativeStream(caseId: string, documentId?: string): Narrati
           });
         }
       } finally {
-        if (abortRef.current === controller) abortRef.current = null;
-        setRunning(false);
+        // Guarded by controller identity for the same reason as `ask`: Stop
+        // clears `abortRef` synchronously, so a regeneration can start before
+        // this task unwinds, and an unguarded `setRunning(false)` would report
+        // the newer one as finished while it is still streaming.
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setRunning(false);
+        }
       }
     })();
   }, [caseId, documentId, client]);
