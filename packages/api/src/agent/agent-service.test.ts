@@ -142,6 +142,35 @@ describe("askCase", () => {
     expect(res.trace.citableClauseIds).toEqual([CLAUSE_ID]);
   });
 
+  /**
+   * FR-5.5 logs retrieval *decisions*, not just their total: the drawer has to
+   * say which call surfaced which clause. A union across the request would
+   * collapse exactly the attribution that makes the trace worth reading.
+   */
+  it("records which clauses each step surfaced, not just how many", async () => {
+    const llm = new ScriptedLlm([
+      callSearch(),
+      answer(`Die Probezeit beträgt sechs Monate [[${CLAUSE_ID}]].`),
+    ]);
+    const res = await ask(llm);
+
+    const [step] = res.trace.steps;
+    expect(step?.tool).toBe("search_clauses");
+    expect(step?.clauseCount).toBe(1);
+    // Enough to name it and to open it — the uuid `GET /clauses/{id}` wants,
+    // and the serialized id the prose cites. Deliberately no clause text.
+    expect(step?.clauses).toEqual([
+      {
+        clauseId: CLAUSE.id,
+        serializedClauseId: CLAUSE_ID,
+        documentId: DOC,
+        clauseRef: CLAUSE.clauseRef,
+        page: CLAUSE.page,
+        heading: CLAUSE.heading,
+      },
+    ]);
+  });
+
   it("returns every tool result for one turn in a single user message", async () => {
     const twoCalls: LlmConverseResult = {
       stopReason: "tool_use",
@@ -235,6 +264,9 @@ describe("askCase", () => {
     const sent = llm.seen[1]!.messages.at(-1)!.content[0];
     expect(sent?.type === "tool_result" && sent.content).toContain("unknown tool");
     expect(res.trace.steps[0]?.ok).toBe(false);
+    // A step that surfaced nothing still satisfies the published schema.
+    expect(res.trace.steps[0]?.clauses).toEqual([]);
+    expect(agentTraceSchema.safeParse(res.trace).success).toBe(true);
   });
 
   it("stops at the turn ceiling when the model never stops calling tools", async () => {

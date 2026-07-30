@@ -48,6 +48,24 @@ export const narrativeCorrectionSchema = groundingRejectionSchema.extend({
 });
 export type NarrativeCorrection = z.infer<typeof narrativeCorrectionSchema>;
 
+/**
+ * Enough of a clause to name it and open it, and nothing more.
+ *
+ * Carried inline rather than as bare ids because a serialized id does not parse
+ * back to the row uuid, and that uuid is what `GET /clauses/{id}` needs - so an
+ * id-only trace would owe the client a round trip per step to render a link.
+ * No `text`: the trace says which clauses were surfaced, not what they said.
+ */
+export const traceClauseRefSchema = z.object({
+  clauseId: z.uuid(),
+  serializedClauseId: z.string(),
+  documentId: z.uuid(),
+  clauseRef: z.string(),
+  page: z.number().int(),
+  heading: z.string().nullable(),
+});
+export type TraceClauseRef = z.infer<typeof traceClauseRefSchema>;
+
 /** One tool call the agent made, in the order it made them. */
 export const traceStepSchema = z.object({
   turn: z.number().int(),
@@ -62,6 +80,12 @@ export const traceStepSchema = z.object({
   /** How many clauses this call put in front of the model (ADR-0010 point 4). */
   clauseCount: z.number().int(),
   durationMs: z.number().int(),
+  /**
+   * *Which* clauses, so the drawer can attribute a retrieval to the decision
+   * that made it (FR-5.5) rather than showing one flat set per answer. Defaulted
+   * because traces written before this field existed are still readable.
+   */
+  clauses: z.array(traceClauseRefSchema).default([]),
 });
 export type TraceStep = z.infer<typeof traceStepSchema>;
 

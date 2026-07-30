@@ -2,6 +2,7 @@ import {
   type AgentCorrection,
   type AgentEvent,
   type AgentTrace,
+  type TraceClauseRef,
   type TraceStep,
 } from "@contractix/shared";
 
@@ -88,6 +89,22 @@ function toCitable(clause: ClauseView): CitableClause {
     charStart: clause.charStart,
     charEnd: clause.charEnd,
     text: clause.text,
+  };
+}
+
+/**
+ * The same clause, minus its text, for the trace. Free: these are already in
+ * hand from the tool outcome, so recording which step surfaced what costs a
+ * `.map()` and no extra query.
+ */
+function toTraceRef(clause: ClauseView): TraceClauseRef {
+  return {
+    clauseId: clause.id,
+    serializedClauseId: clause.serializedClauseId,
+    documentId: clause.documentId,
+    clauseRef: clause.clauseRef,
+    page: clause.page,
+    heading: clause.heading,
   };
 }
 
@@ -185,6 +202,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
             ok: false,
             clauseCount: 0,
             durationMs: Date.now() - at,
+            clauses: [],
           });
           continue;
         }
@@ -217,6 +235,7 @@ export async function askCase(deps: AgentDeps, params: AskParams): Promise<AskRe
           ok,
           clauseCount: outcome.clauses?.length ?? 0,
           durationMs: Date.now() - at,
+          clauses: (outcome.clauses ?? []).map(toTraceRef),
         });
         params.onEvent?.({
           type: "tool_result",
