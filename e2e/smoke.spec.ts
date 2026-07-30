@@ -2,7 +2,8 @@ import { expect, type Page, test } from "@playwright/test";
 
 /**
  * The one end-to-end path: land, acknowledge, adopt the demo corpus, watch it
- * analyze, read the report, click through to the highlighted clause, delete.
+ * analyze, read the report, click through to the highlighted clause, ask a
+ * question and read its trace, delete.
  *
  * Written to pass *keyless*, which is how CI runs it. That constrains what can
  * be asserted, and the constraint is worth stating: with no model key the
@@ -122,6 +123,54 @@ test("a visitor can analyze the demo corpus and click through to a cited clause"
   }
 
   expect(highlighted, "no search hit produced a highlight on a rendered page").toBe(true);
+
+  // --- ask a question, then read its trace (FR-5.1, FR-6.1) --------------------
+  // Exactly "Probezeit": keyless, `FakeLlm` passes the question through as the
+  // search query verbatim, and the search above has just proved that term
+  // returns hits on this corpus. A question that matched nothing would make the
+  // fake emit its no-clause sentence, and there would be no chip to click.
+  const chat = page.locator("section").filter({ hasText: "Ask a question" }).first();
+  await chat.getByRole("textbox", { name: "Your question" }).fill("Probezeit");
+  await chat.getByRole("button", { name: "Ask", exact: true }).click();
+
+  // Retrieval is visible while it happens, rather than a bare spinner.
+  await expect(chat.getByText("Searching the clauses")).toBeVisible({ timeout: 30_000 });
+
+  // Structure, never the fake's prose: keyed and keyless answers share only
+  // the contract that a factual sentence carries a resolvable citation.
+  // Generous because a keyed run is a real frontier call (PRD targets p95 ≤ 8s).
+  const traceButton = chat.getByRole("button", { name: "Show the trace" }).first();
+  await expect(traceButton).toBeVisible({ timeout: 60_000 });
+
+  const answerChip = chat.getByRole("button", { name: /^p\d+$/ }).first();
+  await expect(answerChip).toBeVisible();
+  await answerChip.click();
+
+  const clauseDrawer = page.getByRole("complementary", { name: "Cited clause" });
+  await expect(clauseDrawer).toBeVisible();
+  await expect(clauseDrawer.locator("mark")).toBeVisible({ timeout: 30_000 });
+  await clauseDrawer.getByRole("button", { name: "Close" }).click();
+  await expect(clauseDrawer).toBeHidden();
+
+  await traceButton.click();
+  const trace = page.getByRole("complementary", { name: "Answer trace" });
+  await expect(trace).toBeVisible();
+  await expect(trace.getByText("search_clauses").first()).toBeVisible();
+  await expect(trace.getByText(/clauses? were? citable|clause was citable/)).toBeVisible();
+
+  // A clause chip inside the trace must stack the viewer *over* it, and closing
+  // that must leave the trace still open — the z-30/z-40 contract.
+  await trace
+    .getByRole("button", { name: /· p\d+$/ })
+    .first()
+    .click();
+  await expect(clauseDrawer).toBeVisible();
+  await clauseDrawer.getByRole("button", { name: "Close" }).click();
+  await expect(clauseDrawer).toBeHidden();
+  await expect(trace).toBeVisible();
+
+  await trace.getByRole("button", { name: "Close" }).click();
+  await expect(trace).toBeHidden();
 
   // --- hard delete (PRD §9 flow 4) ---------------------------------------------
   await page.goto("/cases");
