@@ -1,3 +1,4 @@
+import { documentSchema, documentUploadSchema } from "@contractix/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, count, eq } from "drizzle-orm";
 
@@ -12,20 +13,6 @@ import { extensionForMime } from "../storage/local.js";
 const MAX_DOCUMENTS_PER_CASE = 10;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-const documentSchema = z.object({
-  id: z.uuid(),
-  caseId: z.uuid(),
-  filename: z.string(),
-  mimeType: z.string(),
-  byteSize: z.number().int(),
-  sha256: z.string(),
-  status: z.enum(["uploaded", "processing", "ready", "failed"]),
-  analysisStatus: z.enum(["pending", "analyzing", "analyzed", "failed"]),
-  language: z.enum(["de", "en", "mixed"]).nullable(),
-  pageCount: z.number().int().nullable(),
-  parseReport: z.unknown().nullable(),
-});
 
 const uploadDocument = (deps: AppDeps) =>
   createRoute({
@@ -53,7 +40,7 @@ const uploadDocument = (deps: AppDeps) =>
         description: "Document stored and queued for ingestion",
         content: {
           "application/json": {
-            schema: z.object({ document: documentSchema, deduplicated: z.literal(false) }),
+            schema: documentUploadSchema.extend({ deduplicated: z.literal(false) }),
           },
         },
       },
@@ -61,7 +48,7 @@ const uploadDocument = (deps: AppDeps) =>
         description: "Identical bytes already exist in this case",
         content: {
           "application/json": {
-            schema: z.object({ document: documentSchema, deduplicated: z.literal(true) }),
+            schema: documentUploadSchema.extend({ deduplicated: z.literal(true) }),
           },
         },
       },

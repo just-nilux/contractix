@@ -2,9 +2,9 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 
-import { costEur } from "@contractix/shared";
+import { type AgentEvent, askResponseSchema, costEur, DISCLAIMER } from "@contractix/shared";
 
-import { type AgentEvent, askCase } from "../agent/agent-service.js";
+import { askCase } from "../agent/agent-service.js";
 import { saveQaTurn } from "../agent/qa-store.js";
 import { cases } from "../db/schema/index.js";
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
@@ -12,45 +12,8 @@ import { rateLimit, RATE_LIMITED_RESPONSE } from "../auth/rate-limit.js";
 import { type AppDeps } from "../deps.js";
 import { logger } from "../logger.js";
 
-/** FR-7.6 — an answer says what it is, like every report does. */
-const DISCLAIMER =
-  "Informational analysis, not legal or tax advice. Statutory references are pointers, not determinations.";
-
 const askRequestSchema = z.object({
   question: z.string().min(1).max(2_000),
-});
-
-const answerCitationSchema = z.object({
-  clauseId: z.uuid(),
-  serializedClauseId: z.string(),
-  documentId: z.uuid(),
-  page: z.number().int(),
-  charStart: z.number().int(),
-  charEnd: z.number().int(),
-  verbatimAnchor: z.string(),
-});
-
-const askResponseSchema = z.object({
-  turnId: z.uuid(),
-  question: z.string(),
-  answer: z.string(),
-  disclaimer: z.string(),
-  citations: z.array(answerCitationSchema),
-  /**
-   * Assertions the validator could not tie to a retrieved clause. Surfaced
-   * rather than dropped (FR-5.2) — an unverifiable claim the user can see is
-   * safer than one silently removed.
-   */
-  couldNotVerify: z.array(z.string()),
-  grounded: z.boolean(),
-  corrected: z.boolean(),
-  usage: z.object({
-    inputTokens: z.number().int(),
-    outputTokens: z.number().int(),
-    costEur: z.number(),
-    latencyMs: z.number().int(),
-  }),
-  trace: z.unknown(),
 });
 
 const askRoute = (deps: AppDeps) =>

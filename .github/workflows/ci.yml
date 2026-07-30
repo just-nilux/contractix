@@ -81,3 +81,65 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+
+  # The browser-level path, keyless: upload → analyze → report → cited clause.
+  # Runs with no provider keys, so it exercises the empty states a keyless
+  # deployment actually produces rather than a path only a funded run reaches.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: contractix
+          POSTGRES_PASSWORD: contractix
+          POSTGRES_DB: contractix
+        ports:
+          - "5433:5432"
+        options: >-
+          --health-cmd "pg_isready -U contractix -d contractix"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - "6380:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://contractix:contractix@localhost:5433/contractix
+      REDIS_URL: redis://localhost:6380
+      STORAGE_DIR: /tmp/contractix-files
+      # `pnpm dev` starts the API, which refuses to boot in production without one.
+      SESSION_SECRET: e2e-only-secret-not-used-anywhere-else
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Enforce redis noeviction policy
+        run: docker exec ${{ job.services.redis.id }} redis-cli config set maxmemory-policy noeviction
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
+      # Keyless: deterministic fake embeddings, and every document classifies as
+      # `other`, which is exactly the state the spec asserts against.
+      - run: pnpm seed:demo
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

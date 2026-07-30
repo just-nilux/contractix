@@ -2,13 +2,21 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { type Block, canonicalText } from "@contractix/shared";
 
 import { db, pool } from "../db/client.js";
-import { cases, chunks, clauses, documents } from "../db/schema/index.js";
+import {
+  cases,
+  chunks,
+  citations,
+  clauses,
+  documents,
+  extractions,
+  flags,
+} from "../db/schema/index.js";
 import { createTestTenant, deleteTestTenant } from "../auth/testing.js";
 import { FakeEmbeddings } from "../providers/index.js";
 import { LocalBlobStore } from "../storage/local.js";
@@ -127,6 +135,81 @@ describe("ingestion pipeline end-to-end (fake providers)", () => {
     const after = await db.select().from(clauses).where(eq(clauses.documentId, documentId));
     expect(after.length).toBe(before.length);
     expect(new Set(after.map((c) => c.clauseRef))).toEqual(new Set(before.map((c) => c.clauseRef)));
+  });
+
+  /**
+   * A re-ingest deletes and recreates clauses with fresh ids. Citations cascade
+   * with them, but extractions and flags do not, and `flags.clause_ids` is a
+   * bare uuid[] with no foreign key — so leaving them behind produced fields
+   * with no citations and flags citing clauses that no longer exist. The report
+   * renders those as chips that resolve to nothing, which is the "every
+   * citation resolves to a real span" guarantee failing silently.
+   */
+  it("invalidates the analysis derived from the clauses it replaces", async () => {
+    const clauseRows = await db.select().from(clauses).where(eq(clauses.documentId, documentId));
+    const staleClauseId = clauseRows[0]!.id;
+
+    const extraction = await db
+      .insert(extractions)
+      .values({
+        documentId,
+        tenantId,
+        caseId,
+        schemaVer: "employment@1",
+        fieldPath: "probation.months",
+        value: 6,
+        confidence: "high",
+        status: "extracted",
+      })
+      .returning({ id: extractions.id });
+    await db.insert(citations).values({
+      tenantId,
+      documentId,
+      sourceType: "extraction",
+      extractionId: extraction[0]!.id,
+      clauseId: staleClauseId,
+      charStart: 0,
+      charEnd: 5,
+      verbatimAnchor: "Probe",
+    });
+    await db.insert(flags).values({
+      documentId,
+      tenantId,
+      caseId,
+      ruleId: "DE-PROBEZEIT-MAX",
+      ruleVersion: "1",
+      severity: "red",
+      clauseIds: [staleClauseId],
+      rationale: "stale",
+      sources: [],
+    });
+    await db
+      .update(documents)
+      .set({ analysisStatus: "analyzed" })
+      .where(eq(documents.id, documentId));
+
+    await runIngestion({ db, blobStore, embeddings }, documentId);
+
+    expect(
+      await db.select().from(extractions).where(eq(extractions.documentId, documentId)),
+    ).toHaveLength(0);
+    expect(await db.select().from(flags).where(eq(flags.documentId, documentId))).toHaveLength(0);
+    expect(
+      await db.select().from(citations).where(eq(citations.documentId, documentId)),
+    ).toHaveLength(0);
+
+    // Reset so the worker re-chains analysis over the clauses that now exist.
+    const doc = (await db.select().from(documents).where(eq(documents.id, documentId)))[0];
+    expect(doc?.analysisStatus).toBe("pending");
+
+    // No flag may reference a clause that is gone.
+    const dangling = await db.execute<{ n: number }>(sql`
+      select count(*)::int as n
+      from flags f, unnest(f.clause_ids) as u(cid)
+      left join clauses c on c.id = u.cid
+      where f.document_id = ${documentId} and c.id is null
+    `);
+    expect(dangling.rows[0]!.n).toBe(0);
   });
 
   it("marks unparseable uploads failed without throwing (no pointless retries)", async () => {

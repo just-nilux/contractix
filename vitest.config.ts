@@ -7,7 +7,9 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["packages/*/src/**/*.test.ts"],
-          exclude: ["**/*.int.test.ts"],
+          // The web has its own project (React plugin, jsdom, .tsx); without
+          // this exclusion its .ts tests would also run here, without a DOM.
+          exclude: ["**/*.int.test.ts", "packages/web/**"],
         },
       },
       {
@@ -22,6 +24,7 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      "./packages/web/vitest.config.ts",
     ],
   },
 });

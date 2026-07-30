@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { canonicalText, type ParseReport } from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
-import { chunks, clauses, documents } from "../db/schema/index.js";
+import { chunks, clauses, documents, extractions, flags } from "../db/schema/index.js";
 import { type EmbeddingsProvider } from "../providers/index.js";
 import { extensionForMime, type LocalBlobStore } from "../storage/local.js";
 import { chunkClause } from "./chunker/chunker.js";
@@ -130,6 +130,16 @@ export async function runIngestion(
   await deps.db.transaction(async (tx) => {
     await tx.delete(clauses).where(eq(clauses.documentId, documentId));
 
+    // Everything the analysis produced was derived from clauses that no longer
+    // exist, so it is invalidated with them. Citations cascade off `clauses`;
+    // extractions and flags do not, and `flags.clause_ids` is a bare uuid[]
+    // with no foreign key to catch the dangling reference. Left in place, a
+    // re-ingest leaves fields with no citations and flags citing deleted
+    // clauses - which the report renders as chips that resolve to nothing,
+    // breaking the "every citation resolves to a real span" guarantee.
+    await tx.delete(extractions).where(eq(extractions.documentId, documentId));
+    await tx.delete(flags).where(eq(flags.documentId, documentId));
+
     const insertedClauses = await tx
       .insert(clauses)
       .values(
@@ -180,6 +190,8 @@ export async function runIngestion(
       .update(documents)
       .set({
         status: "ready",
+        // The analysis has just been invalidated above; the worker re-chains it.
+        analysisStatus: "pending",
         pageCount: parsed.pageCount,
         language: docLanguage,
         parseReport: parsed.report,

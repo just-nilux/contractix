@@ -1,8 +1,11 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
+
+import { serializeClauseId } from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
-import { citations, qaTurns } from "../db/schema/index.js";
+import { citations, clauses, qaTurns } from "../db/schema/index.js";
 import { type AskResult } from "./agent-service.js";
+import { type NarrativeResult } from "./report-writer.js";
 
 export interface QaStoreDeps {
   db: Db;
@@ -116,4 +119,149 @@ export async function listQaTurns(
     createdAt: r.createdAt,
     trace: r.traceJson,
   }));
+}
+
+/**
+ * Persist a narrative report (FR-5.3). Same table, same citation path, same
+ * transaction guarantee as a Q&A turn - a narrative *is* an agent-written,
+ * cited, validated generation with a trace, tokens, cost and latency. `kind`
+ * keeps them apart for the cost KPI and for the UI.
+ */
+export async function saveNarrativeTurn(
+  deps: QaStoreDeps,
+  params: {
+    tenantId: string;
+    caseId: string;
+    documentId?: string;
+    result: NarrativeResult;
+    costEur: number;
+  },
+): Promise<PersistedTurn> {
+  const { result } = params;
+
+  return deps.db.transaction(async (tx) => {
+    const [turn] = await tx
+      .insert(qaTurns)
+      .values({
+        tenantId: params.tenantId,
+        caseId: params.caseId,
+        kind: "report",
+        ...(params.documentId ? { documentId: params.documentId } : {}),
+        promptVersion: result.promptVersion,
+        // The "question" of a report is the request that produced it; kept
+        // non-null so one table serves both kinds without a nullable column.
+        question: params.documentId
+          ? `narrative report for document ${params.documentId}`
+          : "narrative report for case",
+        answer: result.markdown,
+        traceJson: result.trace,
+        grounded: result.grounded,
+        corrected: result.corrected,
+        couldNotVerify: result.couldNotVerify,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        costEur: params.costEur.toFixed(6),
+        latencyMs: result.latencyMs,
+      })
+      .returning({ id: qaTurns.id, createdAt: qaTurns.createdAt });
+
+    if (!turn) throw new Error("failed to persist narrative turn");
+
+    if (result.citations.length > 0) {
+      await tx.insert(citations).values(
+        result.citations.map((c) => ({
+          tenantId: params.tenantId,
+          documentId: c.documentId,
+          sourceType: "answer" as const,
+          answerId: turn.id,
+          clauseId: c.clauseId,
+          charStart: c.charStart,
+          charEnd: c.charEnd,
+          verbatimAnchor: c.verbatimAnchor,
+        })),
+      );
+    }
+
+    return turn;
+  });
+}
+
+export interface StoredNarrative {
+  turnId: string;
+  markdown: string;
+  citations: {
+    clauseId: string;
+    /** The `[[...]]` marker the narrative text carries; the client joins on it. */
+    serializedClauseId: string;
+    page: number;
+    charStart: number;
+    charEnd: number;
+    documentId: string;
+  }[];
+  couldNotVerify: string[];
+  grounded: boolean;
+  corrected: boolean;
+  promptVersion: string;
+  createdAt: Date;
+  trace: unknown;
+}
+
+/** The latest narrative for a case, if one has been generated. */
+export async function latestNarrative(
+  deps: QaStoreDeps,
+  params: { caseId: string; tenantId: string; documentId?: string },
+): Promise<StoredNarrative | null> {
+  const rows = await deps.db
+    .select()
+    .from(qaTurns)
+    .where(
+      and(
+        eq(qaTurns.caseId, params.caseId),
+        eq(qaTurns.tenantId, params.tenantId),
+        eq(qaTurns.kind, "report"),
+        params.documentId ? eq(qaTurns.documentId, params.documentId) : isNull(qaTurns.documentId),
+      ),
+    )
+    .orderBy(desc(qaTurns.createdAt))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  // Joined to `clauses` for the natural ref: the narrative's text cites clauses
+  // by their serialized id, so without it a reader's client cannot tie a
+  // `[[...]]` marker in the prose to the citation row that justifies it. The
+  // citations table stores the uuid, which is the identity; the serialized form
+  // is derived from it (ADR-0005) rather than duplicated into a column.
+  const citationRows = await deps.db
+    .select({
+      clauseId: citations.clauseId,
+      clauseRef: clauses.clauseRef,
+      page: clauses.page,
+      charStart: citations.charStart,
+      charEnd: citations.charEnd,
+      documentId: citations.documentId,
+    })
+    .from(citations)
+    .innerJoin(clauses, eq(clauses.id, citations.clauseId))
+    .where(and(eq(citations.answerId, row.id), eq(citations.tenantId, params.tenantId)));
+
+  return {
+    turnId: row.id,
+    markdown: row.answer,
+    citations: citationRows.map((c) => ({
+      clauseId: c.clauseId,
+      serializedClauseId: serializeClauseId(c.documentId, c.clauseRef),
+      page: c.page,
+      charStart: c.charStart,
+      charEnd: c.charEnd,
+      documentId: c.documentId,
+    })),
+    couldNotVerify: (row.couldNotVerify ?? []) as string[],
+    grounded: row.grounded,
+    corrected: row.corrected,
+    promptVersion: row.promptVersion,
+    createdAt: row.createdAt,
+    trace: row.traceJson,
+  };
 }

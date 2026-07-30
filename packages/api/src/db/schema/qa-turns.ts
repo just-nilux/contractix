@@ -12,6 +12,7 @@ import {
 import { v7 as uuidv7 } from "uuid";
 
 import { cases } from "./cases.js";
+import { documents } from "./documents.js";
 
 /**
  * One answered question (PRD data model §8, FR-5.5). `traceJson` holds the
@@ -34,6 +35,19 @@ export const qaTurns = pgTable(
     caseId: uuid()
       .notNull()
       .references(() => cases.id, { onDelete: "cascade" }),
+    /**
+     * What kind of generation this row is. A narrative report is an
+     * agent-written, cited, validated generation with a trace, tokens, cost and
+     * latency - which is exactly what this table already holds - so it lives
+     * here rather than in a parallel table with a duplicate citation path.
+     */
+    kind: text({ enum: ["ask", "report"] })
+      .notNull()
+      .default("ask"),
+    /** Set when a report is scoped to one document rather than the whole case. */
+    documentId: uuid().references(() => documents.id, { onDelete: "cascade" }),
+    /** Which prompt produced it (PRD E-4: prompt changes are reviewable events). */
+    promptVersion: text().notNull().default("agent@2"),
     question: text().notNull(),
     answer: text().notNull(),
     /** Model id, turns, tool steps, citable clause ids, stop reason. */
@@ -50,5 +64,9 @@ export const qaTurns = pgTable(
     latencyMs: integer().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("qa_turns_case_idx").on(t.caseId), index("qa_turns_tenant_idx").on(t.tenantId)],
+  (t) => [
+    index("qa_turns_case_idx").on(t.caseId),
+    index("qa_turns_tenant_idx").on(t.tenantId),
+    index("qa_turns_case_kind_idx").on(t.caseId, t.kind, t.createdAt.desc()),
+  ],
 );

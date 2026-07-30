@@ -1,94 +1,38 @@
-import { type DocumentType, type Language, serializeClauseId } from "@contractix/shared";
+import {
+  type CaseReport,
+  caseReportSchema,
+  DISCLAIMER,
+  type DocumentReport,
+  documentExtractionSchema,
+  documentReportSchema,
+  type DocumentType,
+  type Language,
+  reportCitationSchema,
+  reportFieldSchema,
+  reportFlagSchema,
+  serializeClauseId,
+} from "@contractix/shared";
+
+// The response shapes live in @contractix/shared so the web validates against
+// the exact schema this API publishes; re-exported here because this module is
+// still where report *behaviour* lives.
+export {
+  caseReportSchema,
+  documentExtractionSchema,
+  documentReportSchema,
+  reportCitationSchema,
+  reportFieldSchema,
+  reportFlagSchema,
+  type CaseReport,
+  type DocumentReport,
+};
 import { and, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
 
 import { type Db } from "../db/client.js";
 import { cases, citations, clauses, documents, extractions, flags } from "../db/schema/index.js";
 
-/** FR-7.6 — every report says what it is (and is not). */
-const DISCLAIMER =
-  "Informational analysis, not legal or tax advice. Statutory references are pointers, not determinations.";
-
 const SEVERITY_ORDER = { red: 0, amber: 1, info: 2 } as const;
 type Severity = keyof typeof SEVERITY_ORDER;
-
-export const reportCitationSchema = z.object({
-  clauseId: z.uuid(),
-  /** The canonical "{documentId}:{page}:{path}" id (ADR-0005). */
-  serializedClauseId: z.string(),
-  clauseRef: z.string(),
-  page: z.number().int(),
-  heading: z.string().nullable(),
-  /** Present for extraction citations (the resolved span); null for whole-clause flag citations. */
-  charStart: z.number().int().nullable(),
-  charEnd: z.number().int().nullable(),
-  verbatimAnchor: z.string().nullable(),
-});
-
-export const reportFieldSchema = z.object({
-  fieldPath: z.string(),
-  value: z.unknown(),
-  unit: z.string().nullable(),
-  confidence: z.enum(["high", "medium", "low"]),
-  status: z.enum(["extracted", "not_found", "extraction_failed"]),
-  citations: z.array(reportCitationSchema),
-});
-
-export const reportFlagSchema = z.object({
-  ruleId: z.string(),
-  ruleVersion: z.string(),
-  severity: z.enum(["red", "amber", "info"]),
-  rationale: z.string(),
-  negotiationHint: z.string().nullable(),
-  sources: z.array(z.string()),
-  citations: z.array(reportCitationSchema),
-});
-
-const flagCountsSchema = z.object({
-  red: z.number().int(),
-  amber: z.number().int(),
-  info: z.number().int(),
-});
-
-/** FR-6.2's `GET /documents/:id/extraction` - the report's extraction slice. */
-export const documentExtractionSchema = z.object({
-  documentId: z.uuid(),
-  disclaimer: z.string(),
-  extraction: z.object({ schemaVer: z.string(), fields: z.array(reportFieldSchema) }).nullable(),
-});
-
-export const documentReportSchema = z.object({
-  document: z.object({
-    id: z.uuid(),
-    caseId: z.uuid(),
-    filename: z.string(),
-    type: z.string().nullable(),
-    language: z.string().nullable(),
-    status: z.string(),
-    analysisStatus: z.string(),
-    pageCount: z.number().int().nullable(),
-  }),
-  disclaimer: z.string(),
-  /** null when the classified type has no extraction family (Q&A-only, FR-1.2). */
-  extraction: z.object({ schemaVer: z.string(), fields: z.array(reportFieldSchema) }).nullable(),
-  flags: z.array(reportFlagSchema),
-  summary: z.object({
-    flagCounts: flagCountsSchema,
-    extractedFieldCount: z.number().int(),
-    notFoundCount: z.number().int(),
-  }),
-});
-
-export type DocumentReport = z.infer<typeof documentReportSchema>;
-
-export const caseReportSchema = z.object({
-  case: z.object({ id: z.uuid(), title: z.string() }),
-  disclaimer: z.string(),
-  documents: z.array(documentReportSchema),
-  summary: z.object({ documentCount: z.number().int(), flagCounts: flagCountsSchema }),
-});
-
-export type CaseReport = z.infer<typeof caseReportSchema>;
 
 export interface ReportDocRow {
   id: string;

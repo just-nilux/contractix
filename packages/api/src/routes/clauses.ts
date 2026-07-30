@@ -1,23 +1,10 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 
+import { clauseContextSchema, clauseSchema } from "@contractix/shared";
+
 import { type AppEnv, requireTenant, tenantOf } from "../auth/middleware.js";
 import { type AppDeps } from "../deps.js";
 import { getClause, getClauseContext } from "../retrieval/clause-service.js";
-
-const clauseSchema = z.object({
-  id: z.uuid(),
-  documentId: z.uuid(),
-  clauseRef: z.string(),
-  serializedClauseId: z.string(),
-  clausePath: z.string(),
-  heading: z.string().nullable(),
-  headingPath: z.array(z.string()),
-  page: z.number().int(),
-  charStart: z.number().int(),
-  charEnd: z.number().int(),
-  seq: z.number().int(),
-  text: z.string(),
-});
 
 const getClauseRoute = createRoute({
   method: "get",
@@ -47,15 +34,7 @@ const getClauseContextRoute = createRoute({
   responses: {
     200: {
       description: "Clause plus radius neighbors in document order",
-      content: {
-        "application/json": {
-          schema: z.object({
-            clause: clauseSchema,
-            before: z.array(clauseSchema),
-            after: z.array(clauseSchema),
-          }),
-        },
-      },
+      content: { "application/json": { schema: clauseContextSchema } },
     },
     401: { description: "No session, or the session expired" },
     404: { description: "Not found" },

@@ -107,6 +107,8 @@ export const DEFAULT_RATE_LIMITS = {
     { limit: 5, windowSec: 60, scope: "tenant" },
   ],
   analyze: [{ limit: 20, windowSec: 3600, scope: "tenant" }],
+  /** A frontier call per press; tighter than analyze, which is deterministic. */
+  narrative: [{ limit: 10, windowSec: 3600, scope: "tenant" }],
   read: [{ limit: 600, windowSec: 60, scope: "tenant" }],
 } as const satisfies Record<string, readonly RateLimitRule[]>;
 

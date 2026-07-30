@@ -71,6 +71,13 @@
       "when": 1785244605605,
       "tag": "0009_enum-domain-checks",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785245677475,
+      "tag": "0010_qa-turn-kind",
+      "breakpoints": true
     }
   ]
 }
