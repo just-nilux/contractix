@@ -48,7 +48,13 @@ export interface GroundingResult {
   citations: AnswerCitation[];
 }
 
-const MARKER_RE = /\[\[([^[\]]+)\]\]/gu;
+/**
+ * Exported so the conversation history has exactly one definition of what a
+ * marker looks like: prior answers are stripped of them before being replayed
+ * to the model, and a stripper that disagreed with the validator would leak the
+ * ids the validator is there to police.
+ */
+export const MARKER_RE = /\[\[([^[\]]+)\]\]/gu;
 /**
  * Sentence splitting masks markers first, so a clause path containing '.' or
  * '/' can never be read as a sentence boundary. The placeholder is delimited by

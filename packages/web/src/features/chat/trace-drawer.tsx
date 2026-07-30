@@ -1,7 +1,15 @@
-import { type AskResponse, type TraceStep } from "@contractix/shared/schemas";
+import { type AgentTrace, type TraceStep } from "@contractix/shared/schemas";
 
 import { ClauseLink } from "../../citations/clause-link.js";
 import { Button } from "../../components/ui/button.js";
+import { type TurnResult } from "../../stream/ask-reducer.js";
+
+/** A turn whose trace survived — the only kind this drawer can be opened for. */
+export type TracedResult = TurnResult & { trace: AgentTrace };
+
+export function hasTrace(result: TurnResult): result is TracedResult {
+  return result.trace !== null;
+}
 
 function formatEur(value: number): string {
   // Four decimals: a Q&A turn costs well under a cent, and €0.00 would read as
@@ -69,7 +77,13 @@ function StepRow({ step }: { step: TraceStep }) {
  * clause here stacks the document on top and closing it returns you to the
  * trace rather than to the page.
  */
-export function TraceDrawer({ response, onClose }: { response: AskResponse; onClose: () => void }) {
+export function TraceDrawer({
+  response,
+  onClose,
+}: {
+  response: TracedResult;
+  onClose: () => void;
+}) {
   const { trace, usage } = response;
   const keyless = usage.inputTokens === 0 && usage.outputTokens === 0;
 

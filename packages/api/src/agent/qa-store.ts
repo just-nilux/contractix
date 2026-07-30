@@ -1,6 +1,15 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
-import { type NarrativeTrace, narrativeTraceSchema, serializeClauseId } from "@contractix/shared";
+import {
+  type AgentTrace,
+  agentTraceSchema,
+  type AnswerCitation,
+  DISCLAIMER,
+  type NarrativeTrace,
+  narrativeTraceSchema,
+  serializeClauseId,
+  type StoredTurn,
+} from "@contractix/shared";
 
 import { type Db } from "../db/client.js";
 import { citations, clauses, qaTurns } from "../db/schema/index.js";
@@ -79,54 +88,112 @@ export async function saveQaTurn(
   });
 }
 
-export interface QaTurnSummary {
-  id: string;
-  question: string;
-  answer: string;
-  grounded: boolean;
-  corrected: boolean;
-  couldNotVerify: string[];
-  inputTokens: number;
-  outputTokens: number;
-  costEur: number;
-  latencyMs: number;
-  createdAt: Date;
-  trace: unknown;
-}
+/** How many turns `GET /cases/{id}/turns` will replay. */
+export const MAX_LISTED_TURNS = 50;
 
 /**
- * Recent turns for a case, newest first.
+ * The case's Q&A transcript, oldest first, with the citations that justify each
+ * answer.
  *
- * Unused: there is no `GET /cases/{id}/turns`, and the chat transcript is
- * session-local (ADR-0013 decision 6). Kept because it is most of that endpoint
- * already — what it still needs is the citations join, without which a replayed
- * answer renders every `[[...]]` marker as "unresolved".
+ * The join is the reason this took a slice of its own rather than shipping with
+ * the chat panel: without it every `[[...]]` marker in a replayed answer matches
+ * no citation, and `MarkdownView` correctly renders the lot as "unresolved" —
+ * a transcript that paints the whole past conversation as suspect is worse than
+ * no transcript.
+ *
+ * `kind = "ask"` only; a narrative report is a different surface with its own
+ * endpoint.
  */
 export async function listQaTurns(
   deps: QaStoreDeps,
   params: { caseId: string; tenantId: string; limit?: number },
-): Promise<QaTurnSummary[]> {
+): Promise<StoredTurn[]> {
   const rows = await deps.db
     .select()
     .from(qaTurns)
-    .where(and(eq(qaTurns.caseId, params.caseId), eq(qaTurns.tenantId, params.tenantId)))
+    .where(
+      and(
+        eq(qaTurns.caseId, params.caseId),
+        eq(qaTurns.tenantId, params.tenantId),
+        eq(qaTurns.kind, "ask"),
+      ),
+    )
+    // Newest first so the limit drops the *oldest*, then reversed for display.
     .orderBy(desc(qaTurns.createdAt))
-    .limit(params.limit ?? 20);
+    .limit(params.limit ?? MAX_LISTED_TURNS);
 
-  return rows.map((r) => ({
-    id: r.id,
+  if (rows.length === 0) return [];
+
+  // One query for every turn's citations rather than one per turn. Same join and
+  // same derivation as `latestNarrative`: the table stores the clause uuid,
+  // which is the identity, and the serialized form comes from it (ADR-0005).
+  const citationRows = await deps.db
+    .select({
+      answerId: citations.answerId,
+      clauseId: citations.clauseId,
+      clauseRef: clauses.clauseRef,
+      page: clauses.page,
+      charStart: citations.charStart,
+      charEnd: citations.charEnd,
+      documentId: citations.documentId,
+      verbatimAnchor: citations.verbatimAnchor,
+    })
+    .from(citations)
+    .innerJoin(clauses, eq(clauses.id, citations.clauseId))
+    .where(
+      and(
+        inArray(
+          citations.answerId,
+          rows.map((r) => r.id),
+        ),
+        eq(citations.tenantId, params.tenantId),
+        eq(citations.sourceType, "answer"),
+      ),
+    );
+
+  const byTurn = new Map<string, AnswerCitation[]>();
+  for (const c of citationRows) {
+    if (c.answerId === null) continue;
+    const list = byTurn.get(c.answerId) ?? [];
+    list.push({
+      clauseId: c.clauseId,
+      serializedClauseId: serializeClauseId(c.documentId, c.clauseRef),
+      documentId: c.documentId,
+      page: c.page,
+      charStart: c.charStart,
+      charEnd: c.charEnd,
+      verbatimAnchor: c.verbatimAnchor ?? "",
+    });
+    byTurn.set(c.answerId, list);
+  }
+
+  return rows.reverse().map((r) => ({
+    turnId: r.id,
     question: r.question,
     answer: r.answer,
+    disclaimer: DISCLAIMER,
+    citations: byTurn.get(r.id) ?? [],
+    couldNotVerify: (r.couldNotVerify ?? []) as string[],
     grounded: r.grounded,
     corrected: r.corrected,
-    couldNotVerify: (r.couldNotVerify ?? []) as string[],
-    inputTokens: r.inputTokens,
-    outputTokens: r.outputTokens,
-    costEur: Number(r.costEur),
-    latencyMs: r.latencyMs,
-    createdAt: r.createdAt,
-    trace: r.traceJson,
+    usage: {
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      costEur: Number(r.costEur),
+      latencyMs: r.latencyMs,
+    },
+    trace: parseStoredAgentTrace(r.id, r.traceJson),
+    createdAt: r.createdAt.toISOString(),
   }));
+}
+
+/** Same posture as `parseStoredTrace` for narratives: degrade, never 500. */
+function parseStoredAgentTrace(turnId: string, raw: unknown): AgentTrace | null {
+  if (raw == null) return null;
+  const parsed = agentTraceSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  logger.warn({ turnId, issues: parsed.error.issues }, "stored agent trace is not readable");
+  return null;
 }
 
 /**

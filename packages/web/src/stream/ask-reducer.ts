@@ -1,4 +1,9 @@
-import { type AgentStreamEvent, type AskResponse } from "@contractix/shared/schemas";
+import {
+  type AgentStreamEvent,
+  type AgentTrace,
+  type AskResponse,
+  type StoredTurn,
+} from "@contractix/shared/schemas";
 
 /**
  * The chat transcript's state machine.
@@ -22,6 +27,16 @@ export interface ToolActivity {
   clauseCount: number | null;
 }
 
+/**
+ * A finished answer, however it arrived.
+ *
+ * `AskResponse` (streamed, trace always present) and `StoredTurn` (replayed from
+ * `GET /cases/{id}/turns`, trace nullable because an older deploy may have
+ * written it) are both assignable to this, so one component renders a live turn
+ * and a replayed one without a second, subtly different historical type.
+ */
+export type TurnResult = Omit<AskResponse, "trace"> & { trace: AgentTrace | null };
+
 export interface AskTurn {
   id: string;
   question: string;
@@ -31,8 +46,24 @@ export interface AskTurn {
   activity: ToolActivity[];
   /** Why the grounding validator rejected the first answer, if it did. */
   retryReason: string | null;
-  result: AskResponse | null;
+  result: TurnResult | null;
   error: string | null;
+}
+
+/** A turn read back from storage, rendered exactly like one that just streamed. */
+export function replayedTurn(stored: StoredTurn): AskTurn {
+  return {
+    id: stored.turnId,
+    question: stored.question,
+    status: "done",
+    answer: stored.answer,
+    // Tool calls are not replayed live — but `result.trace.steps` still holds
+    // them, so "Show the trace" is as complete for a replayed turn as a fresh one.
+    activity: [],
+    retryReason: null,
+    result: stored,
+    error: null,
+  };
 }
 
 export interface AskState {
@@ -130,6 +161,10 @@ export function askReducer(state: AskState, action: AskAction): AskState {
       const { type: _type, ...response } = action;
       return updateLast(state, (t) => ({
         ...t,
+        // Adopt the server's id now that there is one. The client minted a
+        // provisional id to render the question before the answer existed; from
+        // here the turn is a row, and a replay of it must dedupe against this.
+        id: response.turnId,
         status: "done",
         answer: response.answer,
         result: response,

@@ -59,6 +59,8 @@ pnpm test:e2e              # playwright smoke over the running stack (starts `pn
   clauses it surfaced, never their text; `narrativeSchema.trace` is nullable because that one is
   replayed from storage, and `latestNarrative` parses rather than casts it. On the client, `ask`
   has **no `restart`** — the corrective turn is not streamed, so `retry` keeps the draft and
-  `done` replaces it.
+  `done` replaces it. Conversation history is read from `qa_turns` server-side and **never taken
+  from the request**, and prior answers have their `[[…]]` markers stripped before replay — the
+  citable set is still built only from this request's tool output.
 - `tenant_id` guard in every chunk/clause/extraction/flag/citation/qa_turn query — denormalized
   precisely so no join is needed. Never widen it to set membership.

@@ -1,9 +1,8 @@
-import { type AskResponse } from "@contractix/shared/schemas";
-
 import { CouldNotVerify } from "../../citations/could-not-verify.js";
 import { MarkdownView } from "../../citations/markdown-view.js";
 import { Spinner } from "../../components/ui/spinner.js";
 import { type AskTurn } from "../../stream/ask-reducer.js";
+import { hasTrace, type TracedResult } from "./trace-drawer.js";
 import { ToolActivityList } from "./tool-activity.js";
 
 /** One question and its answer. */
@@ -12,9 +11,10 @@ export function ChatTurn({
   onShowTrace,
 }: {
   turn: AskTurn;
-  onShowTrace: (response: AskResponse) => void;
+  onShowTrace: (response: TracedResult) => void;
 }) {
   const streaming = turn.status === "streaming" || turn.status === "correcting";
+  const traced = turn.result && hasTrace(turn.result) ? turn.result : null;
 
   return (
     <li className="border-t border-slate-200 pt-5 first:border-0 first:pt-0">
@@ -57,15 +57,19 @@ export function ChatTurn({
             {turn.result.grounded ? "Every claim tied to a clause" : "Some claims unverified"}
             {turn.result.corrected ? " · regenerated once" : ""}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              onShowTrace(turn.result!);
-            }}
-            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-900"
-          >
-            Show the trace
-          </button>
+          {/* Absent rather than broken for a turn an older deploy wrote, whose
+              trace no longer parses. The answer and its citations are intact. */}
+          {traced && (
+            <button
+              type="button"
+              onClick={() => {
+                onShowTrace(traced);
+              }}
+              className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-900"
+            >
+              Show the trace
+            </button>
+          )}
         </div>
       )}
     </li>

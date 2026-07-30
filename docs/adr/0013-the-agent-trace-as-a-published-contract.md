@@ -123,7 +123,48 @@ invisible until someone clicks a chip, so the e2e test pins it.
 - **A trace drawer for the narrative.** `narrativeSchema` carries no `usage`, so it could show
   tool calls it never makes and a cost it does not publish. Cost per narrative _is_ persisted in
   `qa_turns`; it is simply not exposed.
-- **Q&A history.** **Trigger to revisit:** the first time a mid-conversation reload on staging
-  actually costs someone an answer, or the moment FR-6.3's `ask_case` needs turns it did not
-  itself produce. `listQaTurns` in `qa-store.ts` is the unused shell of it.
 - **Comparison mode**, still, per PRD §10 — it is Phase 4.
+
+## Amendment, 2026-07-30: decisions 5 and 6 revised
+
+Decision 6 said the transcript was session-local and named a revisit trigger. The trigger fired
+immediately, and for a reason the decision had not considered: the question was never only _where
+the transcript lives_, it was **whether the agent remembers at all**.
+
+It did not. `askCase` opened every request with a single user message, so each question was
+answered in isolation while the panel rendered a transcript implying otherwise. "Und die
+Kündigungsfrist?" had nothing to attach "und" to. That is not a deferred nicety — a chat panel
+whose model has no memory of the exchange above it is mislabelled.
+
+**Conversation memory is server-side.** `loadConversation` reads the case's recent `kind = "ask"`
+rows and the route passes them to `askCase`. History is deliberately _not_ accepted from the
+client: the client already holds a transcript and sending it would be cheaper, but a request that
+can assert what the assistant previously said is a free hand at steering the model through text it
+never wrote. The server wrote those rows.
+
+**Markers are stripped from replayed answers**, reusing the validator's own `MARKER_RE` so there is
+one definition of what a marker is. Decision 1 of ADR-0010 survives untouched: the citable set is
+still built only from _this_ request's tool output. Replaying old ids would put non-citable clauses
+in front of the model, it would cite them, the validator would reject them, and the single
+corrective regeneration would be spent undoing a problem we handed it.
+
+Bounded at six exchanges with answers capped and marked as excerpts — every prior turn is re-sent,
+and re-billed, on each new question. Text only: an earlier request's `tool_use` ids belong to a
+conversation the provider no longer has.
+
+**`GET /cases/{id}/turns` follows from that, not the other way round.** Once the server remembers
+across a reload, a session-local transcript is worse than either alternative: the reader gets an
+answer drawn from context they cannot see. Publishing it makes the visible conversation and the
+model's memory the same set of exchanges. The citations join this ADR named as the blocker is
+exactly what it needed — without it every replayed marker resolves to nothing and the whole past
+conversation renders "unresolved".
+
+A stored turn is `askResponseSchema` plus `createdAt`, so a replayed turn and a live one are one
+shape and one component. Its `trace` is nullable for the reason decision 4 gave the narrative: this
+one too is now replayed from storage. Decision 4's stated basis — "there is no endpoint that
+replays an ask trace" — no longer holds, which is the honest reason this is an amendment and not a
+footnote.
+
+**Still deferred:** whether an `ask_case` MCP tool (FR-6.3) should share this conversation or start
+its own. Six turns is a guess, not a measurement. **Trigger to revisit:** the first transcript
+where the re-sent history is a visible share of the per-question cost the trace drawer now reports.

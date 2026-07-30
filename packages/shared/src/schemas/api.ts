@@ -391,6 +391,30 @@ export const askResponseSchema = z.object({
 });
 export type AskResponse = z.infer<typeof askResponseSchema>;
 
+/**
+ * A turn read back from storage. Structurally the same object the stream's
+ * terminal `done` frame carries, so a replayed transcript and a live one are
+ * the same shape - the client renders both through one component and there is
+ * no second, subtly different "historical answer" type to keep in step.
+ */
+export const storedTurnSchema = askResponseSchema.extend({
+  createdAt: z.iso.datetime(),
+  /**
+   * Nullable here and required on the live response, for the reason ADR-0013
+   * gave the narrative: this one is replayed from `qa_turns`, so it can be of a
+   * shape an older deploy wrote. Losing the trace costs a debug view; refusing
+   * the turn would cost the answer.
+   */
+  trace: agentTraceSchema.nullable(),
+});
+export type StoredTurn = z.infer<typeof storedTurnSchema>;
+
+/** `GET /cases/{id}/turns` - the case's Q&A transcript, oldest first. */
+export const caseTurnsSchema = z.object({
+  turns: z.array(storedTurnSchema),
+});
+export type CaseTurns = z.infer<typeof caseTurnsSchema>;
+
 // --- narrative report (FR-5.3) ------------------------------------------------
 
 export const narrativeCitationSchema = z.object({

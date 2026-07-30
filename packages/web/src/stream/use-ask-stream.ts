@@ -2,9 +2,16 @@ import { agentStreamEventSchema } from "@contractix/shared/schemas";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { RateLimitError } from "../api/errors.js";
+import { getCaseTurns } from "../api/endpoints.js";
+import { RateLimitError, SessionError } from "../api/errors.js";
 import { queryKeys } from "../api/queries.js";
-import { type AskAction, askReducer, type AskState, initialAskState } from "./ask-reducer.js";
+import {
+  type AskAction,
+  askReducer,
+  type AskState,
+  initialAskState,
+  replayedTurn,
+} from "./ask-reducer.js";
 import { parseStreamFrame, postSse } from "./post-sse.js";
 
 export interface AskStream extends AskState {
@@ -35,16 +42,31 @@ export function useAskStream(caseId: string): AskStream {
 
   const { data: state } = useQuery<AskState>({
     queryKey: key,
-    // Never runs: `enabled` is false and `initialData` seeds the entry. Declared
-    // because React Query wants one, and because it is where a real history
-    // fetch would go.
-    queryFn: () => initialAskState,
-    enabled: false,
-    initialData: initialAskState,
+    queryFn: async ({ signal }) => {
+      const { turns } = await getCaseTurns(caseId, { signal });
+      const fetched = turns.map(replayedTurn);
+
+      // Merge rather than replace. The stream writes this same entry, so a
+      // question asked while this request was in flight would otherwise vanish
+      // from the screen the moment the transcript arrived — and the answer would
+      // still be streaming into a turn nobody could see.
+      const known = new Set(fetched.map((t) => t.id));
+      const local = client.getQueryData<AskState>(key)?.turns ?? [];
+      return { turns: [...fetched, ...local.filter((t) => !known.has(t.id))] };
+    },
+    // Fetched once on mount and never again: `staleTime: Infinity` plus the
+    // client's `refetchOnWindowFocus: false` mean the stream stays the only
+    // writer after that, so a refetch can never clobber a live answer.
+    //
+    // Deliberately no `initialData`: seeding it would make the entry
+    // permanently fresh and the transcript would never load at all.
     staleTime: Infinity,
     // Without this the transcript is collected five minutes after the panel
     // unmounts, which is exactly the case navigating away and back produces.
     gcTime: Infinity,
+    // A 401 still throws to the route boundary; anything else leaves the panel
+    // empty rather than replacing the case with an error page.
+    throwOnError: (error) => error instanceof SessionError,
   });
 
   const dispatch = useCallback(
@@ -123,5 +145,5 @@ export function useAskStream(caseId: string): AskStream {
     [caseId, dispatch],
   );
 
-  return { ...state, rateLimit, ask, stop, running };
+  return { ...(state ?? initialAskState), rateLimit, ask, stop, running };
 }
