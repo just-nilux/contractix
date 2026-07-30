@@ -5,7 +5,7 @@ import path from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { loadModelsConfig } from "@contractix/shared";
+import { loadModelsConfig, type Narrative, serializeClauseId } from "@contractix/shared";
 
 import { createApp } from "../app.js";
 import { DEFAULT_RATE_LIMITS, NoopRateLimiter } from "../auth/rate-limit.js";
@@ -46,17 +46,8 @@ const OFFER = buildPdf([
   ],
 ]);
 
-interface NarrativeBody {
-  turnId: string;
-  markdown: string;
-  disclaimer: string;
-  citations: { clauseId: string; documentId: string }[];
-  couldNotVerify: string[];
-  grounded: boolean;
-  corrected: boolean;
-  promptVersion: string;
-  trace: { stubbed: boolean; citableClauseIds: string[] };
-}
+/** The published type, not a local restatement that could drift away from it. */
+type NarrativeBody = Narrative;
 
 async function readSse(res: Response): Promise<{ event: string; data: unknown }[]> {
   const reader = (res.body as ReadableStream<Uint8Array>).getReader();
@@ -89,6 +80,7 @@ describe("narrative report route", () => {
   let caseId: string;
   let documentId: string;
   let citedClauseId: string;
+  let citedSerializedClauseId: string;
 
   beforeAll(async () => {
     storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "contractix-narrative-"));
@@ -124,11 +116,12 @@ describe("narrative report route", () => {
     // hand: the citable set is built from persisted citations, and an empty one
     // is a different code path (the stub).
     const clauseRows = await db
-      .select({ id: clauses.id })
+      .select({ id: clauses.id, clauseRef: clauses.clauseRef })
       .from(clauses)
       .where(eq(clauses.documentId, documentId))
       .orderBy(clauses.seq);
     citedClauseId = clauseRows[1]!.id;
+    citedSerializedClauseId = serializeClauseId(documentId, clauseRows[1]!.clauseRef);
 
     const extraction = await db
       .insert(extractions)
@@ -214,9 +207,13 @@ describe("narrative report route", () => {
     expect(body.promptVersion).toBe("report@1");
     // FR-7.6: every surface says what it is.
     expect(body.disclaimer).toContain("not legal");
-    // The citable set came from the persisted citation, not from the model.
-    expect(body.trace.stubbed).toBe(false);
-    expect(body.trace.citableClauseIds).toContain(citedClauseId);
+    // The citable set came from the persisted citation, not from the model, and
+    // is recorded in the serialized form a `[[...]]` marker carries — so a
+    // reader can join the trace to the prose. It used to hold the row uuid,
+    // which joined to nothing.
+    expect(body.trace).not.toBeNull();
+    expect(body.trace!.stubbed).toBe(false);
+    expect(body.trace!.citableClauseIds).toContain(citedSerializedClauseId);
 
     const rows = await db
       .select()
@@ -256,7 +253,7 @@ describe("narrative report route", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as NarrativeBody;
     expect(body.markdown.length).toBeGreaterThan(0);
-    expect(body.trace.stubbed).toBe(false);
+    expect(body.trace?.stubbed).toBe(false);
   });
 
   // Keyless mode with nothing analysed: no model call, deterministic markdown.
@@ -272,7 +269,7 @@ describe("narrative report route", () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as NarrativeBody;
-    expect(body.trace.stubbed).toBe(true);
+    expect(body.trace?.stubbed).toBe(true);
     expect(body.grounded).toBe(true);
     expect(body.markdown).toContain("## Summary");
   });

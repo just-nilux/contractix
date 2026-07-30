@@ -92,7 +92,9 @@ describe("parseStreamFrame", () => {
       corrected: false,
       promptVersion: "1",
       createdAt: "2026-07-28T10:00:00.000Z",
-      trace: {},
+      // Null rather than a full trace: this test is about the discriminator,
+      // and null is the legitimate value a row of an older shape degrades to.
+      trace: null,
     };
 
     const parsed = parseStreamFrame(narrativeStreamEventSchema, {

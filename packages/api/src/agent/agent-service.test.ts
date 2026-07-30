@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { agentTraceSchema } from "@contractix/shared";
+
 import { type Db } from "../db/client.js";
 import {
   type LlmConverseOptions,
@@ -117,6 +119,27 @@ describe("askCase", () => {
     expect(res.trace.turns).toBe(2);
     expect(res.trace.steps.map((s) => s.tool)).toEqual(["search_clauses"]);
     expect(res.usage).toEqual({ inputTokens: 20, outputTokens: 10 });
+  });
+
+  /**
+   * The trace is published as `askResponseSchema.trace`, so what this loop
+   * builds and what the API promises have to be the same object. `AskResult`
+   * being a `z.infer` catches a field going missing at compile time; this
+   * catches a *value* the schema would reject, which the types cannot see.
+   */
+  it("emits a trace the published schema accepts", async () => {
+    const llm = new ScriptedLlm([
+      callSearch(),
+      answer(`Die Probezeit beträgt sechs Monate [[${CLAUSE_ID}]].`),
+    ]);
+    const res = await ask(llm);
+
+    const parsed = agentTraceSchema.safeParse(res.trace);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(parsed.success).toBe(true);
+    // Serialized ids, so a reader can join the citable set to the `[[...]]`
+    // markers in the prose. The row uuid would join to nothing.
+    expect(res.trace.citableClauseIds).toEqual([CLAUSE_ID]);
   });
 
   it("returns every tool result for one turn in a single user message", async () => {
