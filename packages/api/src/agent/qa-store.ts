@@ -94,7 +94,14 @@ export interface QaTurnSummary {
   trace: unknown;
 }
 
-/** Recent turns for a case, newest first — the chat history the UI replays. */
+/**
+ * Recent turns for a case, newest first.
+ *
+ * Unused: there is no `GET /cases/{id}/turns`, and the chat transcript is
+ * session-local (ADR-0013 decision 6). Kept because it is most of that endpoint
+ * already — what it still needs is the citations join, without which a replayed
+ * answer renders every `[[...]]` marker as "unresolved".
+ */
 export async function listQaTurns(
   deps: QaStoreDeps,
   params: { caseId: string; tenantId: string; limit?: number },
