@@ -1,3 +1,5 @@
+import { type AskResponse } from "@contractix/shared/schemas";
+
 import { CouldNotVerify } from "../../citations/could-not-verify.js";
 import { MarkdownView } from "../../citations/markdown-view.js";
 import { Spinner } from "../../components/ui/spinner.js";
@@ -5,7 +7,13 @@ import { type AskTurn } from "../../stream/ask-reducer.js";
 import { ToolActivityList } from "./tool-activity.js";
 
 /** One question and its answer. */
-export function ChatTurn({ turn }: { turn: AskTurn }) {
+export function ChatTurn({
+  turn,
+  onShowTrace,
+}: {
+  turn: AskTurn;
+  onShowTrace: (response: AskResponse) => void;
+}) {
   const streaming = turn.status === "streaming" || turn.status === "correcting";
 
   return (
@@ -44,10 +52,21 @@ export function ChatTurn({ turn }: { turn: AskTurn }) {
       {turn.result && <CouldNotVerify claims={turn.result.couldNotVerify} />}
 
       {turn.result && (
-        <p className="mt-3 text-xs text-slate-500">
-          {turn.result.grounded ? "Every claim tied to a clause" : "Some claims unverified"}
-          {turn.result.corrected ? " · regenerated once" : ""}
-        </p>
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
+          <p className="text-xs text-slate-500">
+            {turn.result.grounded ? "Every claim tied to a clause" : "Some claims unverified"}
+            {turn.result.corrected ? " · regenerated once" : ""}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              onShowTrace(turn.result!);
+            }}
+            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-900"
+          >
+            Show the trace
+          </button>
+        </div>
       )}
     </li>
   );

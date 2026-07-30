@@ -1,10 +1,11 @@
-import { ASK_QUESTION_MAX_CHARS, DISCLAIMER } from "@contractix/shared/schemas";
+import { ASK_QUESTION_MAX_CHARS, type AskResponse, DISCLAIMER } from "@contractix/shared/schemas";
 import { type FormEvent, useId, useState } from "react";
 
 import { RateLimitedNotice } from "../../components/states/rate-limited.js";
 import { Button } from "../../components/ui/button.js";
 import { useAskStream } from "../../stream/use-ask-stream.js";
 import { ChatTurn } from "./chat-turn.js";
+import { TraceDrawer } from "./trace-drawer.js";
 
 /**
  * German and English, because the demo corpus is both and the first thing a
@@ -27,6 +28,7 @@ const EXAMPLES = [
 export function ChatPanel({ caseId }: { caseId: string }) {
   const inputId = useId();
   const [draft, setDraft] = useState("");
+  const [traceFor, setTraceFor] = useState<AskResponse | null>(null);
   const stream = useAskStream(caseId);
 
   const submit = (question: string) => {
@@ -71,9 +73,20 @@ export function ChatPanel({ caseId }: { caseId: string }) {
       ) : (
         <ul className="mt-4 space-y-5 rounded-lg border border-slate-200 p-6">
           {stream.turns.map((turn) => (
-            <ChatTurn key={turn.id} turn={turn} />
+            <ChatTurn key={turn.id} turn={turn} onShowTrace={setTraceFor} />
           ))}
         </ul>
+      )}
+
+      {/* Local state, not a provider: a trace belongs to one turn on one page,
+          unlike a citation target, which four surfaces can open. */}
+      {traceFor && (
+        <TraceDrawer
+          response={traceFor}
+          onClose={() => {
+            setTraceFor(null);
+          }}
+        />
       )}
 
       {stream.rateLimit && (

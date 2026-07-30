@@ -53,11 +53,11 @@ function turn(overrides: Partial<AskTurn> = {}): AskTurn {
   };
 }
 
-function renderTurn(t: AskTurn) {
+function renderTurn(t: AskTurn, onShowTrace: (r: AskResponse) => void = () => undefined) {
   return render(
     <CitationProvider>
       <ul>
-        <ChatTurn turn={t} />
+        <ChatTurn turn={t} onShowTrace={onShowTrace} />
       </ul>
     </CitationProvider>,
   );
